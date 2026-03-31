@@ -30,8 +30,8 @@ export function MatchSimulation({ match, homeTeam, awayTeam, events, onComplete 
   const [currentEvent, setCurrentEvent] = useState<MatchEvent | null>(null);
   const [isFinished, setIsFinished] = useState(false);
 
-  const requestRef = useRef<number>();
-  const lastTimeRef = useRef<number>();
+  const requestRef = useRef<number>(0);
+  const lastTimeRef = useRef<number>(0);
   const minuteRef = useRef(0);
   const processedEventsRef = useRef<Set<string>>(new Set());
   

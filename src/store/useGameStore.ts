@@ -1,11 +1,11 @@
 import { create } from 'zustand';
-import { GameState, Team, Player, Match, GameMode } from '../types/game';
-import { generateTeams } from '../game/generator';
+import { GameState, Team, Player, Match, GameMode, MatchEvent } from '../types/game';
+import { generateTeams, generateNationalTeams } from '../game/generator';
 import { generateSchedule, simulateMatch } from '../game/engine';
 
 interface GameStore extends GameState {
-  startNewGame: (name: string, mode: GameMode, teamName?: string) => void;
-  playWeek: () => void;
+  startNewGame: (name: string, mode: GameMode, teamName?: string, playerDetails?: Partial<Player>) => void;
+  playWeek: (userMatchResult?: { matchId: string, homeScore: number, awayScore: number, events: MatchEvent[] }) => void;
   updateLineup: (teamId: string, starters: string[]) => void;
   toggleStarter: (playerId: string) => void;
   setGameState: (state: GameState) => void;
@@ -16,6 +16,11 @@ interface GameStore extends GameState {
   distributePrizeMoney: () => void;
   upgradeStadium: (type: 'capacity' | 'food' | 'merch' | 'build') => void;
   trainPlayer: () => { success: boolean, improved: boolean, message: string } | undefined;
+  generateJobOffers: () => void;
+  acceptJobOffer: (teamId: string) => void;
+  generatePlayerOffers: () => void;
+  acceptPlayerOffer: (teamId: string) => void;
+  nextSeason: () => void;
 }
 
 const initialState: GameState = {
@@ -27,6 +32,9 @@ const initialState: GameState = {
   gameMode: null,
   isGameOver: false,
   marketPlayers: [],
+  activeMatchId: null,
+  managerReputation: 10,
+  jobOffers: [],
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -111,7 +119,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }));
   },
 
-  startNewGame: (name, mode, teamName) => {
+  startNewGame: (name, mode, teamName, playerDetails) => {
     const teams = generateTeams();
     let userTeamId = null;
     let userPlayerId = null;
@@ -123,16 +131,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
         userTeamId = userTeam.id;
       }
     } else if (mode === 'player') {
-      // Create a player and assign to a random div 4 team
-      const div4Teams = teams.filter(t => t.division === 4);
-      const randomTeam = div4Teams[Math.floor(Math.random() * div4Teams.length)];
+      // Create a player and assign to a random lowest division team of their nationality
+      const nationality = playerDetails?.nationality || 'BR';
+      const countryTeams = teams.filter(t => t.country === nationality);
+      const maxDiv = Math.max(...countryTeams.map(t => t.division));
+      const lowestDivTeams = countryTeams.filter(t => t.division === maxDiv);
+      
+      let selectedTeam = teamName ? teams.find(t => t.id === teamName) : null;
+      if (!selectedTeam) {
+        selectedTeam = lowestDivTeams[Math.floor(Math.random() * lowestDivTeams.length)];
+      }
       
       const newPlayer: Player = {
         id: Math.random().toString(36).substr(2, 9),
         name: name,
-        position: 'ATK', // Default for now
+        position: playerDetails?.position || 'ATK',
         overall: 65,
-        age: 18,
+        age: playerDetails?.age || 18,
         energy: 100,
         isStarter: true,
         value: 1000000,
@@ -141,18 +156,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
         goals: 0,
         assists: 0,
         yellowCards: 0,
-        redCards: 0
+        redCards: 0,
+        nationality: playerDetails?.nationality,
+        preferredFoot: playerDetails?.preferredFoot,
+        height: playerDetails?.height,
+        weight: playerDetails?.weight,
+        jerseyNumber: playerDetails?.jerseyNumber,
+        careerGoals: 0,
+        careerAssists: 0,
+        careerMatches: 0,
       };
 
-      randomTeam.players.push(newPlayer);
-      userTeamId = randomTeam.id;
-      userPlayerId = newPlayer.id;
+      if (selectedTeam) {
+        selectedTeam.players.push(newPlayer);
+        selectedTeam.isUserControlled = true;
+        userTeamId = selectedTeam.id;
+        userPlayerId = newPlayer.id;
+      }
     }
 
-    const matches = generateSchedule(teams);
+    const nationalTeams = generateNationalTeams(teams);
+    const allTeams = [...teams, ...nationalTeams];
+
+    const matches = generateSchedule(allTeams);
 
     set({
-      teams,
+      teams: allTeams,
       matches,
       currentWeek: 1,
       userTeamId,
@@ -160,6 +189,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameMode: mode,
       isGameOver: false,
       marketPlayers: [],
+      activeMatchId: null,
+      managerReputation: 10,
+      jobOffers: [],
     });
     
     get().generateMarket();
@@ -207,6 +239,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const hasMoreMatches = matches.some(m => m.week > currentWeek);
       if (!hasMoreMatches) {
         get().distributePrizeMoney();
+        if (get().gameMode === 'manager') {
+          get().generateJobOffers();
+        } else if (get().gameMode === 'player') {
+          get().generatePlayerOffers();
+        }
         set({ isGameOver: true });
       } else {
         set({ currentWeek: currentWeek + 1 });
@@ -223,10 +260,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // AI Tactical Decision: Update Lineups for non-user teams
     updatedTeams.forEach(team => {
-      if (!team.isUserControlled) {
+      if (!team.isUserControlled || get().gameMode === 'player') {
         const sortedPlayers = [...team.players].sort((a, b) => {
-          const scoreA = a.overall * (0.5 + a.energy / 200);
-          const scoreB = b.overall * (0.5 + b.energy / 200);
+          // Force user player to be highly rated for starter selection
+          const isUser = get().gameMode === 'player' && a.id === get().userPlayerId;
+          const isUserB = get().gameMode === 'player' && b.id === get().userPlayerId;
+          
+          const scoreA = isUser ? 999 : a.overall * (0.5 + a.energy / 200);
+          const scoreB = isUserB ? 999 : b.overall * (0.5 + b.energy / 200);
           return scoreB - scoreA;
         });
 
@@ -280,6 +321,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
         events: result.events.map(e => ({ ...e, matchId: match.id }))
       };
 
+      // Update manager reputation if user's team played
+      const { userTeamId, managerReputation } = get();
+      let newReputation = managerReputation;
+      if (home.id === userTeamId || away.id === userTeamId) {
+        const isHome = home.id === userTeamId;
+        const userScore = isHome ? result.homeScore : result.awayScore;
+        const oppScore = isHome ? result.awayScore : result.homeScore;
+        
+        if (userScore > oppScore) {
+          newReputation = Math.min(100, newReputation + 1); // Win
+        } else if (userScore < oppScore) {
+          newReputation = Math.max(0, newReputation - 1); // Loss
+        } else {
+          newReputation = Math.min(100, newReputation + 0.2); // Draw
+        }
+        set({ managerReputation: newReputation });
+      }
+
       // Collect players who played
       home.players.filter(p => p.isStarter).forEach(p => playedPlayerIds.add(p.id));
       away.players.filter(p => p.isStarter).forEach(p => playedPlayerIds.add(p.id));
@@ -323,15 +382,47 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const playerIndex = updatedTeams[teamIndex].players.findIndex(p => p.id === event.playerId);
         
         if (playerIndex !== -1) {
-          if (event.type === 'GOAL') updatedTeams[teamIndex].players[playerIndex].goals += 1;
+          if (event.type === 'GOAL') {
+            updatedTeams[teamIndex].players[playerIndex].goals += 1;
+            updatedTeams[teamIndex].players[playerIndex].careerGoals = (updatedTeams[teamIndex].players[playerIndex].careerGoals || 0) + 1;
+          }
           if (event.type === 'YELLOW_CARD') updatedTeams[teamIndex].players[playerIndex].yellowCards += 1;
           if (event.type === 'RED_CARD') updatedTeams[teamIndex].players[playerIndex].redCards += 1;
+          
+          // Sync to club team if this is a national team match
+          if (updatedTeams[teamIndex].division === 0) {
+            const clubTeam = updatedTeams.find(t => t.division > 0 && t.players.some(p => p.id === event.playerId));
+            if (clubTeam) {
+              const clubPlayer = clubTeam.players.find(p => p.id === event.playerId);
+              if (clubPlayer) {
+                if (event.type === 'GOAL') {
+                  clubPlayer.goals += 1;
+                  clubPlayer.careerGoals = (clubPlayer.careerGoals || 0) + 1;
+                }
+                if (event.type === 'YELLOW_CARD') clubPlayer.yellowCards += 1;
+                if (event.type === 'RED_CARD') clubPlayer.redCards += 1;
+              }
+            }
+          }
         }
 
         if (event.assistPlayerId) {
           const assistIndex = updatedTeams[teamIndex].players.findIndex(p => p.id === event.assistPlayerId);
           if (assistIndex !== -1) {
             updatedTeams[teamIndex].players[assistIndex].assists += 1;
+            updatedTeams[teamIndex].players[assistIndex].careerAssists = (updatedTeams[teamIndex].players[assistIndex].careerAssists || 0) + 1;
+            
+            // Sync to club team if this is a national team match
+            if (updatedTeams[teamIndex].division === 0) {
+              const clubTeam = updatedTeams.find(t => t.division > 0 && t.players.some(p => p.id === event.assistPlayerId));
+              if (clubTeam) {
+                const clubPlayer = clubTeam.players.find(p => p.id === event.assistPlayerId);
+                if (clubPlayer) {
+                  clubPlayer.assists += 1;
+                  clubPlayer.careerAssists = (clubPlayer.careerAssists || 0) + 1;
+                }
+              }
+            }
           }
         }
       });
@@ -340,22 +431,53 @@ export const useGameStore = create<GameStore>((set, get) => ({
       home.players.filter(p => p.isStarter).forEach(p => {
         const pIdx = updatedTeams[homeIndex].players.findIndex(up => up.id === p.id);
         updatedTeams[homeIndex].players[pIdx].matchesPlayed += 1;
+        updatedTeams[homeIndex].players[pIdx].careerMatches = (updatedTeams[homeIndex].players[pIdx].careerMatches || 0) + 1;
+        
+        if (home.division === 0) {
+          const clubTeam = updatedTeams.find(t => t.division > 0 && t.players.some(cp => cp.id === p.id));
+          if (clubTeam) {
+            const clubPlayer = clubTeam.players.find(cp => cp.id === p.id);
+            if (clubPlayer) {
+              clubPlayer.matchesPlayed += 1;
+              clubPlayer.careerMatches = (clubPlayer.careerMatches || 0) + 1;
+            }
+          }
+        }
       });
       away.players.filter(p => p.isStarter).forEach(p => {
         const pIdx = updatedTeams[awayIndex].players.findIndex(up => up.id === p.id);
         updatedTeams[awayIndex].players[pIdx].matchesPlayed += 1;
+        updatedTeams[awayIndex].players[pIdx].careerMatches = (updatedTeams[awayIndex].players[pIdx].careerMatches || 0) + 1;
+        
+        if (away.division === 0) {
+          const clubTeam = updatedTeams.find(t => t.division > 0 && t.players.some(cp => cp.id === p.id));
+          if (clubTeam) {
+            const clubPlayer = clubTeam.players.find(cp => cp.id === p.id);
+            if (clubPlayer) {
+              clubPlayer.matchesPlayed += 1;
+              clubPlayer.careerMatches = (clubPlayer.careerMatches || 0) + 1;
+            }
+          }
+        }
       });
     });
 
     // Update Energy
+    const processedEnergy = new Map<string, number>();
     updatedTeams.forEach(team => {
       team.players.forEach(player => {
-        if (playedPlayerIds.has(player.id)) {
-          // Played: lose energy
-          player.energy = Math.max(0, Math.round(player.energy - (15 + Math.random() * 15)));
+        if (!processedEnergy.has(player.id)) {
+          if (playedPlayerIds.has(player.id)) {
+            // Played: lose energy
+            player.energy = Math.max(0, Math.round(player.energy - (15 + Math.random() * 15)));
+          } else {
+            // Rested: gain energy
+            player.energy = Math.min(100, Math.round(player.energy + (20 + Math.random() * 10)));
+          }
+          processedEnergy.set(player.id, player.energy);
         } else {
-          // Rested: gain energy
-          player.energy = Math.min(100, Math.round(player.energy + (20 + Math.random() * 10)));
+          // Sync energy if already processed
+          player.energy = processedEnergy.get(player.id)!;
         }
       });
     });
@@ -384,8 +506,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   toggleStarter: (playerId) => {
     set(state => {
-      const { userTeamId, teams } = state;
-      if (!userTeamId) return state;
+      const { userTeamId, teams, gameMode } = state;
+      if (!userTeamId || gameMode === 'player') return state;
 
       const userTeam = teams.find(t => t.id === userTeamId);
       if (!userTeam) return state;
@@ -468,28 +590,53 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!userPlayerId) return undefined;
 
     let result = { success: false, improved: false, message: 'Não foi possível treinar.' };
+    let energyDeducted = false;
+    let overallIncreased = false;
+    let newOverall = 0;
+    let newValue = 0;
+    let newSalary = 0;
 
     set(state => ({
       teams: state.teams.map(team => {
         const playerIndex = team.players.findIndex(p => p.id === userPlayerId);
         if (playerIndex !== -1) {
           const newTeam = { ...team };
-          const player = newTeam.players[playerIndex];
-          if (player.energy >= 20) {
-            player.energy -= 20;
-            result.success = true;
-            result.message = 'Treino concluído! Você gastou 20 de energia.';
-            // Small chance to increase overall
-            if (Math.random() > 0.7 && player.overall < 99) {
-              player.overall += 1;
-              player.value = Math.round((Math.pow(player.overall, 3) * 10 * (player.age < 23 ? 1.5 : 1)) / 10000) * 10000;
-              player.salary = Math.round(player.value * 0.01 / 1000) * 1000;
-              result.improved = true;
-              result.message = 'Treino excelente! Seu overall aumentou em +1.';
+          const player = { ...newTeam.players[playerIndex] };
+          
+          if (!energyDeducted) {
+            if (player.energy >= 20) {
+              player.energy -= 20;
+              result.success = true;
+              result.message = 'Treino concluído! Você gastou 20 de energia.';
+              // Small chance to increase overall
+              if (Math.random() > 0.7 && player.overall < 99) {
+                player.overall += 1;
+                player.value = Math.round((Math.pow(player.overall, 3) * 10 * (player.age < 23 ? 1.5 : 1)) / 10000) * 10000;
+                player.salary = Math.round(player.value * 0.01 / 1000) * 1000;
+                result.improved = true;
+                result.message = 'Treino excelente! Seu overall aumentou em +1.';
+                
+                overallIncreased = true;
+                newOverall = player.overall;
+                newValue = player.value;
+                newSalary = player.salary;
+              }
+              energyDeducted = true;
+            } else {
+              result.message = 'Energia insuficiente para treinar.';
+              return team; // Don't update if not enough energy
             }
           } else {
-            result.message = 'Energia insuficiente para treinar.';
+            // Apply the same updates to other instances of the player (e.g., national team)
+            player.energy -= 20;
+            if (overallIncreased) {
+              player.overall = newOverall;
+              player.value = newValue;
+              player.salary = newSalary;
+            }
           }
+          
+          newTeam.players[playerIndex] = player;
           return newTeam;
         }
         return team;
@@ -497,5 +644,185 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }));
 
     return result;
+  },
+
+  generateJobOffers: () => {
+    const { teams, managerReputation, gameMode, userTeamId } = get();
+    if (gameMode !== 'manager') return;
+
+    const offers: string[] = [];
+    
+    let targetDivision = 4;
+    if (managerReputation > 75) targetDivision = 1;
+    else if (managerReputation > 50) targetDivision = 2;
+    else if (managerReputation > 25) targetDivision = 3;
+
+    // Get teams from target division or lower (excluding current team)
+    const eligibleTeams = teams.filter(t => t.division >= targetDivision && t.id !== userTeamId);
+    
+    // Pick 1-3 random teams
+    const numOffers = Math.floor(Math.random() * 3) + 1;
+    for (let i = 0; i < numOffers; i++) {
+      if (eligibleTeams.length > 0) {
+        const randomIndex = Math.floor(Math.random() * eligibleTeams.length);
+        offers.push(eligibleTeams[randomIndex].id);
+        eligibleTeams.splice(randomIndex, 1); // Prevent duplicate offers
+      }
+    }
+
+    set({ jobOffers: offers });
+  },
+
+  acceptJobOffer: (teamId: string) => {
+    const { teams, userTeamId } = get();
+    set({
+      teams: teams.map(t => {
+        if (t.id === userTeamId) return { ...t, isUserControlled: false };
+        if (t.id === teamId) return { ...t, isUserControlled: true };
+        return t;
+      }),
+      userTeamId: teamId,
+      jobOffers: []
+    });
+  },
+
+  generatePlayerOffers: () => {
+    const { teams, userPlayerId, userTeamId } = get();
+    const offers: string[] = [];
+    
+    const userTeam = teams.find(t => t.id === userTeamId);
+    if (!userTeam) return;
+    
+    const userPlayer = userTeam.players.find(p => p.id === userPlayerId);
+    if (!userPlayer) return;
+
+    // Determine eligible divisions based on player overall
+    let targetDivision = 4;
+    if (userPlayer.overall > 75) targetDivision = 1;
+    else if (userPlayer.overall > 65) targetDivision = 2;
+    else if (userPlayer.overall > 55) targetDivision = 3;
+
+    // Get teams from target division or lower (excluding current team)
+    const eligibleTeams = teams.filter(t => t.division > 0 && t.division >= targetDivision && t.id !== userTeamId);
+    
+    // Pick 1-3 random teams
+    const numOffers = Math.floor(Math.random() * 3) + 1;
+    for (let i = 0; i < numOffers; i++) {
+      if (eligibleTeams.length > 0) {
+        const randomIndex = Math.floor(Math.random() * eligibleTeams.length);
+        offers.push(eligibleTeams[randomIndex].id);
+        eligibleTeams.splice(randomIndex, 1); // Prevent duplicate offers
+      }
+    }
+
+    set({ jobOffers: offers });
+  },
+
+  acceptPlayerOffer: (teamId: string) => {
+    const { teams, userTeamId, userPlayerId } = get();
+    
+    const oldTeam = teams.find(t => t.id === userTeamId);
+    if (!oldTeam) return;
+    
+    const userPlayer = oldTeam.players.find(p => p.id === userPlayerId);
+    if (!userPlayer) return;
+
+    set({
+      teams: teams.map(t => {
+        if (t.id === userTeamId) {
+          return {
+            ...t,
+            isUserControlled: false,
+            players: t.players.filter(p => p.id !== userPlayerId)
+          };
+        }
+        if (t.id === teamId) {
+          return {
+            ...t,
+            isUserControlled: true,
+            players: [...t.players, { ...userPlayer, isStarter: true }]
+          };
+        }
+        return t;
+      }),
+      userTeamId: teamId,
+      jobOffers: []
+    });
+  },
+
+  nextSeason: () => {
+    const { teams, userPlayerId, gameMode } = get();
+    
+    // Filter out old national teams
+    const clubTeams = teams.filter(t => t.division > 0);
+
+    // Age players and reset team stats
+    const updatedClubTeams = clubTeams.map(team => {
+      const updatedPlayers = team.players.map(p => {
+        let newAge = p.age + 1;
+        let newOverall = p.overall;
+        
+        // Custom progression for user player
+        if (gameMode === 'player' && p.id === userPlayerId) {
+          let performanceBonus = 0;
+          if (p.matchesPlayed > 10) performanceBonus += 1;
+          if (p.goals > 10) performanceBonus += 1;
+          if (p.assists > 10) performanceBonus += 1;
+          if (p.overall < 90) newOverall += performanceBonus;
+        } else {
+          // Progression/Regression for NPCs
+          if (newAge < 25) newOverall += Math.floor(Math.random() * 3);
+          else if (newAge > 32) newOverall -= Math.floor(Math.random() * 3);
+        }
+        
+        // Retirement (prevent user player from retiring)
+        let isRetiring = false;
+        if (newAge > 35 && Math.random() > 0.5 && p.id !== userPlayerId) {
+          newAge = 17 + Math.floor(Math.random() * 3);
+          newOverall = 55 + Math.floor(Math.random() * 15);
+          isRetiring = true;
+        }
+
+        return {
+          ...p,
+          age: newAge,
+          overall: Math.min(99, Math.max(40, newOverall)),
+          goals: 0,
+          assists: 0,
+          yellowCards: 0,
+          redCards: 0,
+          matchesPlayed: 0,
+          careerGoals: isRetiring ? 0 : p.careerGoals,
+          careerAssists: isRetiring ? 0 : p.careerAssists,
+          careerMatches: isRetiring ? 0 : p.careerMatches,
+        };
+      });
+
+      return {
+        ...team,
+        players: updatedPlayers,
+        stats: {
+          LEAGUE: { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
+          REGIONAL: { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
+          NATIONAL_CUP: { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
+          CONTINENTAL: { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
+          CONTINENTAL_SECONDARY: { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
+          WORLD_CUP: { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }
+        }
+      };
+    });
+
+    const newNationalTeams = generateNationalTeams(updatedClubTeams);
+    const allUpdatedTeams = [...updatedClubTeams, ...newNationalTeams];
+
+    const newMatches = generateSchedule(allUpdatedTeams);
+
+    set({
+      teams: allUpdatedTeams,
+      matches: newMatches,
+      currentWeek: 1,
+      isGameOver: false,
+      jobOffers: []
+    });
   }
 }));

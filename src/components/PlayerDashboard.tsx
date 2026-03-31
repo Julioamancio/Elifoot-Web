@@ -6,10 +6,11 @@ export function PlayerDashboard() {
   const { teams, userPlayerId, trainPlayer } = useGameStore();
   const [trainResult, setTrainResult] = useState<{ success: boolean, improved: boolean, message: string } | null>(null);
   
-  const userTeam = teams.find(t => t.players.some(p => p.id === userPlayerId));
-  const player = userTeam?.players.find(p => p.id === userPlayerId);
+  const userClub = teams.find(t => t.division > 0 && t.players.some(p => p.id === userPlayerId));
+  const userNationalTeam = teams.find(t => t.division === 0 && t.players.some(p => p.id === userPlayerId));
+  const player = userClub?.players.find(p => p.id === userPlayerId);
 
-  if (!player || !userTeam) return null;
+  if (!player || !userClub) return null;
 
   const handleTrain = () => {
     const result = trainPlayer();
@@ -27,7 +28,18 @@ export function PlayerDashboard() {
         </div>
         <div>
           <h2 className="text-2xl font-bold text-slate-100">Meu Jogador</h2>
-          <p className="text-slate-400">{player.name} • {userTeam.name}</p>
+          <p className="text-slate-400">
+            {player.name} • {userClub.name} {userNationalTeam ? `• ${userNationalTeam.name}` : ''}
+          </p>
+          <div className="flex gap-4 mt-2 text-sm text-slate-500">
+            <span>Idade: {player.age}</span>
+            <span>Nacionalidade: {player.nationality}</span>
+            <span>Posição: {player.position}</span>
+            {player.jerseyNumber && <span>Camisa: {player.jerseyNumber}</span>}
+            {player.preferredFoot && <span>Perna Boa: {player.preferredFoot === 'Right' ? 'Direita' : player.preferredFoot === 'Left' ? 'Esquerda' : 'Ambas'}</span>}
+            {player.height && <span>Altura: {player.height}cm</span>}
+            {player.weight && <span>Peso: {player.weight}kg</span>}
+          </div>
         </div>
       </div>
 
@@ -71,6 +83,27 @@ export function PlayerDashboard() {
             <p className="text-xl font-bold text-slate-100">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(player.value)}
             </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-8">
+        <h3 className="text-xl font-bold text-slate-200 mb-4 flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-yellow-400" />
+          Estatísticas da Carreira
+        </h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
+            <p className="text-sm font-medium text-slate-400 mb-1">Partidas</p>
+            <p className="text-2xl font-bold text-slate-100">{player.careerMatches || 0}</p>
+          </div>
+          <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
+            <p className="text-sm font-medium text-slate-400 mb-1">Gols</p>
+            <p className="text-2xl font-bold text-slate-100">{player.careerGoals || 0}</p>
+          </div>
+          <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
+            <p className="text-sm font-medium text-slate-400 mb-1">Assistências</p>
+            <p className="text-2xl font-bold text-slate-100">{player.careerAssists || 0}</p>
           </div>
         </div>
       </div>

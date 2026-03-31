@@ -3,26 +3,79 @@ import { useGameStore } from '../store/useGameStore';
 import { Trophy, Users, Activity, Calendar, DollarSign } from 'lucide-react';
 
 export function Dashboard() {
-  const { teams, userTeamId, currentWeek, matches } = useGameStore();
+  const { teams, userTeamId, userPlayerId, currentWeek, matches, gameMode } = useGameStore();
   const userTeam = teams.find(t => t.id === userTeamId);
+  const userNationalTeam = gameMode === 'player' ? teams.find(t => t.division === 0 && t.players.some(p => p.id === userPlayerId)) : null;
 
   if (!userTeam) return null;
 
-  const nextMatch = matches.find(m => (m.homeTeamId === userTeam.id || m.awayTeamId === userTeam.id) && !m.played);
-  const nextOpponentId = nextMatch?.homeTeamId === userTeam.id ? nextMatch?.awayTeamId : nextMatch?.homeTeamId;
+  const nextMatch = matches.find(m => 
+    ((m.homeTeamId === userTeam.id || m.awayTeamId === userTeam.id) || 
+    (userNationalTeam && (m.homeTeamId === userNationalTeam.id || m.awayTeamId === userNationalTeam.id))) && 
+    !m.played
+  );
+  
+  const isNationalMatch = nextMatch && userNationalTeam && (nextMatch.homeTeamId === userNationalTeam.id || nextMatch.awayTeamId === userNationalTeam.id);
+  const relevantTeam = isNationalMatch ? userNationalTeam : userTeam;
+  
+  const nextOpponentId = nextMatch?.homeTeamId === relevantTeam.id ? nextMatch?.awayTeamId : nextMatch?.homeTeamId;
   const nextOpponent = teams.find(t => t.id === nextOpponentId);
 
   const teamOverall = Math.round(userTeam.players.reduce((sum, p) => sum + p.overall, 0) / userTeam.players.length);
   const startersOverall = Math.round(userTeam.players.filter(p => p.isStarter).reduce((sum, p) => sum + p.overall, 0) / 11) || 0;
 
   const leagueStats = userTeam.stats.LEAGUE;
+  const userPlayer = gameMode === 'player' ? userTeam.players.find(p => p.id === userPlayerId) : null;
 
   return (
     <div className="space-y-6">
       <header className="mb-8">
         <h1 className="text-3xl font-bold text-slate-100">Visão Geral</h1>
-        <p className="text-slate-400 mt-1">Bem-vindo de volta, treinador.</p>
+        <p className="text-slate-400 mt-1">
+          {gameMode === 'player' ? `Bem-vindo de volta, ${userPlayer?.name}.` : 'Bem-vindo de volta, treinador.'}
+        </p>
       </header>
+
+      {gameMode === 'player' && userPlayer && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex items-center gap-4">
+            <div className="p-3 bg-blue-500/20 text-blue-400 rounded-xl">
+              <Activity className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-400">Seu Overall</p>
+              <p className="text-2xl font-bold text-slate-100">{userPlayer.overall}</p>
+            </div>
+          </div>
+          <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex items-center gap-4">
+            <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl">
+              <Trophy className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-400">Gols</p>
+              <p className="text-2xl font-bold text-slate-100">{userPlayer.goals}</p>
+            </div>
+          </div>
+          <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex items-center gap-4">
+            <div className="p-3 bg-yellow-500/20 text-yellow-400 rounded-xl">
+              <Users className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-400">Assistências</p>
+              <p className="text-2xl font-bold text-slate-100">{userPlayer.assists}</p>
+            </div>
+          </div>
+          <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex items-center gap-4">
+            <div className="p-3 bg-purple-500/20 text-purple-400 rounded-xl">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-400">Partidas</p>
+              <p className="text-2xl font-bold text-slate-100">{userPlayer.matchesPlayed}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex items-center gap-4">
@@ -72,11 +125,12 @@ export function Dashboard() {
             <h2 className="text-xl font-semibold text-slate-100">Próximo Jogo</h2>
             {nextMatch && (
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-900 text-slate-300 border border-slate-700">
-                {nextMatch.competition === 'LEAGUE' ? `Nacional Div ${userTeam.division}` :
-                 nextMatch.competition === 'REGIONAL' ? (userTeam.continent === 'SA' ? `Estadual (${userTeam.state})` : `Regional (${userTeam.country})`) :
-                 nextMatch.competition === 'NATIONAL_CUP' ? (userTeam.continent === 'SA' ? 'Copa do Brasil' : `Copa (${userTeam.country})`) :
-                 nextMatch.competition === 'CONTINENTAL' ? (userTeam.continent === 'SA' ? 'Libertadores' : 'Champions') :
-                 (userTeam.continent === 'SA' ? 'Sul-Americana' : 'Europa League')}
+                {nextMatch.competition === 'LEAGUE' ? `Nacional Div ${relevantTeam.division}` :
+                 nextMatch.competition === 'REGIONAL' ? (relevantTeam.continent === 'SA' ? `Estadual (${relevantTeam.state})` : `Regional (${relevantTeam.country})`) :
+                 nextMatch.competition === 'NATIONAL_CUP' ? (relevantTeam.continent === 'SA' ? 'Copa do Brasil' : `Copa (${relevantTeam.country})`) :
+                 nextMatch.competition === 'CONTINENTAL' ? (relevantTeam.continent === 'SA' ? 'Libertadores' : 'Champions') :
+                 nextMatch.competition === 'WORLD_CUP' ? 'Copa do Mundo' :
+                 (relevantTeam.continent === 'SA' ? 'Sul-Americana' : 'Europa League')}
               </span>
             )}
           </div>
@@ -85,14 +139,14 @@ export function Dashboard() {
               <div className="flex flex-col items-center justify-center gap-4 py-8">
                 <div className="flex items-center gap-8 w-full justify-center">
                   <div className="text-right flex-1">
-                    <p className="text-lg font-bold text-slate-200">{nextMatch.homeTeamId === userTeam.id ? userTeam.name : nextOpponent?.name}</p>
+                    <p className="text-lg font-bold text-slate-200">{nextMatch.homeTeamId === relevantTeam.id ? relevantTeam.name : nextOpponent?.name}</p>
                     <p className="text-sm text-slate-400">Casa</p>
                   </div>
                   <div className="px-4 py-2 bg-slate-900 rounded-lg text-slate-400 font-mono font-bold">
                     VS
                   </div>
                   <div className="text-left flex-1">
-                    <p className="text-lg font-bold text-slate-200">{nextMatch.awayTeamId === userTeam.id ? userTeam.name : nextOpponent?.name}</p>
+                    <p className="text-lg font-bold text-slate-200">{nextMatch.awayTeamId === relevantTeam.id ? relevantTeam.name : nextOpponent?.name}</p>
                     <p className="text-sm text-slate-400">Fora</p>
                   </div>
                 </div>

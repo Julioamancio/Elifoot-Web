@@ -56,11 +56,30 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+function removeUndefined<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined) as unknown as T;
+  }
+  const newObj: any = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = (obj as any)[key];
+      if (value !== undefined) {
+        newObj[key] = removeUndefined(value);
+      }
+    }
+  }
+  return newObj as T;
+}
+
 export const AuthButton: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { teams, matches, currentWeek, userTeamId, isGameOver, setGameState } = useGameStore();
+  const { teams, matches, currentWeek, userTeamId, userPlayerId, gameMode, marketPlayers, activeMatchId, isGameOver, setGameState } = useGameStore();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -75,12 +94,21 @@ export const AuthButton: React.FC = () => {
     const path = `saves/${user.uid}`;
     try {
       const saveRef = doc(db, 'saves', user.uid);
-      await setDoc(saveRef, {
+      
+      const dataToSave = removeUndefined({
         teams,
         matches,
         currentWeek,
-        userTeamId,
-        isGameOver,
+        userTeamId: userTeamId ?? null,
+        userPlayerId: userPlayerId ?? null,
+        gameMode: gameMode ?? null,
+        isGameOver: isGameOver ?? false,
+        marketPlayers: marketPlayers ?? [],
+        activeMatchId: activeMatchId ?? null,
+      });
+
+      await setDoc(saveRef, {
+        ...dataToSave,
         updatedAt: serverTimestamp(),
       });
       alert('Jogo salvo com sucesso!');
@@ -114,6 +142,9 @@ export const AuthButton: React.FC = () => {
           userPlayerId: data.userPlayerId || null,
           gameMode: data.gameMode || 'manager',
           marketPlayers: data.marketPlayers || [],
+          activeMatchId: data.activeMatchId || null,
+          managerReputation: data.managerReputation || 0,
+          jobOffers: data.jobOffers || [],
         });
         alert('Jogo carregado com sucesso!');
       } else {

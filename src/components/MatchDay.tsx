@@ -7,7 +7,7 @@ import { simulateMatch } from '../game/engine';
 import { MatchEvent } from '../types/game';
 
 export function MatchDay() {
-  const { teams, matches, currentWeek, playWeek, userTeamId, isGameOver } = useGameStore();
+  const { teams, matches, currentWeek, playWeek, userTeamId, userPlayerId, isGameOver, gameMode } = useGameStore();
   const [isSimulating, setIsSimulating] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [activeSimulation, setActiveSimulation] = useState<{
@@ -18,19 +18,27 @@ export function MatchDay() {
   } | null>(null);
 
   const userTeam = teams.find(t => t.id === userTeamId);
+  const userNationalTeam = gameMode === 'player' ? teams.find(t => t.division === 0 && t.players.some(p => p.id === userPlayerId)) : null;
+  
   const currentMatches = matches.filter(m => m.week === currentWeek);
   const previousMatches = matches.filter(m => m.week === currentWeek - 1);
 
   const handlePlayWeek = () => {
     if (!userTeam) return;
     
-    const startersCount = userTeam.players.filter(p => p.isStarter).length;
-    if (startersCount !== 11) {
-      alert(`Você precisa escalar exatamente 11 jogadores. Atualmente tem ${startersCount}.`);
-      return;
+    if (gameMode === 'manager') {
+      const startersCount = userTeam.players.filter(p => p.isStarter).length;
+      if (startersCount !== 11) {
+        alert(`Você precisa escalar exatamente 11 jogadores. Atualmente tem ${startersCount}.`);
+        return;
+      }
     }
 
-    const userMatch = currentMatches.find(m => m.homeTeamId === userTeamId || m.awayTeamId === userTeamId);
+    const userMatch = currentMatches.find(m => 
+      m.homeTeamId === userTeamId || 
+      m.awayTeamId === userTeamId || 
+      (userNationalTeam && (m.homeTeamId === userNationalTeam.id || m.awayTeamId === userNationalTeam.id))
+    );
     
     if (userMatch) {
       const home = teams.find(t => t.id === userMatch.homeTeamId)!;
@@ -68,16 +76,108 @@ export function MatchDay() {
   };
 
   if (isGameOver) {
+    const { jobOffers, acceptJobOffer, acceptPlayerOffer, gameMode, managerReputation, userPlayerId } = useGameStore.getState();
+    const offers = jobOffers.map(id => teams.find(t => t.id === id)).filter(Boolean);
+    const userPlayer = userTeam?.players.find(p => p.id === userPlayerId);
+
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8">
         <h1 className="text-4xl font-black text-emerald-500">FIM DE TEMPORADA</h1>
         <p className="text-xl text-slate-300">O campeonato terminou. Verifique a classificação final.</p>
-        <button 
-          onClick={() => useGameStore.getState().resetGame()}
-          className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
-        >
-          Iniciar Nova Carreira
-        </button>
+        
+        {gameMode === 'manager' && (
+          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 max-w-2xl w-full">
+            <h2 className="text-2xl font-bold text-slate-100 mb-2">Sua Reputação: {Math.round(managerReputation)}/100</h2>
+            <p className="text-slate-400 mb-6">Com base no seu desempenho, você recebeu as seguintes propostas de trabalho:</p>
+            
+            {offers.length > 0 ? (
+              <div className="space-y-4">
+                {offers.map(team => team && (
+                  <div key={team.id} className="flex items-center justify-between p-4 bg-slate-900 rounded-xl border border-slate-700">
+                    <div className="text-left">
+                      <p className="font-bold text-lg text-slate-200">{team.name}</p>
+                      <p className="text-sm text-slate-400">Divisão {team.division} - {team.country}</p>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        acceptJobOffer(team.id);
+                        useGameStore.getState().nextSeason();
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all"
+                    >
+                      Aceitar Proposta
+                    </button>
+                  </div>
+                ))}
+                <div className="pt-4 mt-4 border-t border-slate-700">
+                  <button 
+                    onClick={() => useGameStore.getState().nextSeason()}
+                    className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all w-full"
+                  >
+                    Continuar no {userTeam?.name} (Nova Temporada)
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <p className="text-slate-500 italic">Nenhuma proposta recebida no momento.</p>
+                <button 
+                  onClick={() => useGameStore.getState().nextSeason()}
+                  className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
+                >
+                  Continuar no {userTeam?.name} (Nova Temporada)
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {gameMode === 'player' && (
+          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 max-w-2xl w-full">
+            <h2 className="text-2xl font-bold text-slate-100 mb-2">Seu Overall: {userPlayer?.overall}</h2>
+            <p className="text-slate-400 mb-6">Com base no seu desempenho, você recebeu as seguintes propostas de transferência:</p>
+            
+            {offers.length > 0 ? (
+              <div className="space-y-4">
+                {offers.map(team => team && (
+                  <div key={team.id} className="flex items-center justify-between p-4 bg-slate-900 rounded-xl border border-slate-700">
+                    <div className="text-left">
+                      <p className="font-bold text-lg text-slate-200">{team.name}</p>
+                      <p className="text-sm text-slate-400">Divisão {team.division} - {team.country}</p>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        acceptPlayerOffer(team.id);
+                        useGameStore.getState().nextSeason();
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all"
+                    >
+                      Assinar Contrato
+                    </button>
+                  </div>
+                ))}
+                <div className="pt-4 mt-4 border-t border-slate-700">
+                  <button 
+                    onClick={() => useGameStore.getState().nextSeason()}
+                    className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all w-full"
+                  >
+                    Continuar no {userTeam?.name} (Nova Temporada)
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <p className="text-slate-500 italic">Nenhuma proposta recebida no momento.</p>
+                <button 
+                  onClick={() => useGameStore.getState().nextSeason()}
+                  className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
+                >
+                  Continuar no {userTeam?.name} (Nova Temporada)
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -150,13 +250,17 @@ export function MatchDay() {
              comp === 'REGIONAL' ? 'Campeonato Regional' : 
              comp === 'NATIONAL_CUP' ? 'Copa Nacional' :
              comp === 'CONTINENTAL' ? 'Copa Continental' :
+             comp === 'WORLD_CUP' ? 'Copa do Mundo' :
              'Copa Continental Secundária'}
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {compMatches.map(match => {
               const home = teams.find(t => t.id === match.homeTeamId);
               const away = teams.find(t => t.id === match.awayTeamId);
-              const isUserMatch = home?.id === userTeamId || away?.id === userTeamId;
+              const isUserMatch = home?.id === userTeamId || away?.id === userTeamId || 
+                                  (userNationalTeam && (home?.id === userNationalTeam.id || away?.id === userNationalTeam.id));
+              const isHomeUser = home?.id === userTeamId || (userNationalTeam && home?.id === userNationalTeam.id);
+              const isAwayUser = away?.id === userTeamId || (userNationalTeam && away?.id === userNationalTeam.id);
 
               if (!home || !away) return null;
 
@@ -171,7 +275,7 @@ export function MatchDay() {
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 text-right">
-                      <p className={cn("font-bold text-lg", isUserMatch && home.id === userTeamId ? "text-emerald-400" : "text-slate-200")}>
+                      <p className={cn("font-bold text-lg", isHomeUser ? "text-emerald-400" : "text-slate-200")}>
                         {home.name}
                       </p>
                     </div>
@@ -187,7 +291,7 @@ export function MatchDay() {
                     </div>
                     
                     <div className="flex-1 text-left">
-                      <p className={cn("font-bold text-lg", isUserMatch && away.id === userTeamId ? "text-emerald-400" : "text-slate-200")}>
+                      <p className={cn("font-bold text-lg", isAwayUser ? "text-emerald-400" : "text-slate-200")}>
                         {away.name}
                       </p>
                     </div>

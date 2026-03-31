@@ -70,9 +70,13 @@ export const generateSchedule = (teams: Team[]): Match[] => {
   const allMatches: Match[] = [];
   let currentWeek = 1;
 
+  // Separate club teams and national teams
+  const clubTeams = teams.filter(t => t.division > 0);
+  const nationalTeams = teams.filter(t => t.division === 0);
+
   // PHASE 1: REGIONAL (State for SA, Country for EU)
   const regionalGroups: Record<string, Team[]> = {};
-  teams.forEach(t => {
+  clubTeams.forEach(t => {
     const key = t.continent === 'SA' ? t.state : t.country;
     if (!regionalGroups[key]) regionalGroups[key] = [];
     regionalGroups[key].push(t);
@@ -90,7 +94,7 @@ export const generateSchedule = (teams: Team[]): Match[] => {
 
   // PHASE 2: LEAGUE (Divisions 1-4)
   const leagueGroups: Record<string, Team[]> = {};
-  teams.forEach(t => {
+  clubTeams.forEach(t => {
     const key = `${t.continent}_DIV${t.division}`;
     if (!leagueGroups[key]) leagueGroups[key] = [];
     leagueGroups[key].push(t);
@@ -108,7 +112,7 @@ export const generateSchedule = (teams: Team[]): Match[] => {
 
   // PHASE 3: NATIONAL CUP (All divisions per country)
   const cupGroups: Record<string, Team[]> = {};
-  teams.forEach(t => {
+  clubTeams.forEach(t => {
     const key = t.country;
     if (!cupGroups[key]) cupGroups[key] = [];
     cupGroups[key].push(t);
@@ -125,25 +129,46 @@ export const generateSchedule = (teams: Team[]): Match[] => {
 
   currentWeek = maxCupWeeks + 1;
 
-  // PHASE 4: CONTINENTAL (Libertadores / Champions)
+  // PHASE 4: CONTINENTAL (Libertadores / Champions / CONCACAF)
   // Top 4 from Div 1 of each continent
-  const saDiv1 = teams.filter(t => t.continent === 'SA' && t.division === 1).slice(0, 4);
-  const euDiv1 = teams.filter(t => t.continent === 'EU' && t.division === 1).slice(0, 4);
+  const saDiv1 = clubTeams.filter(t => t.continent === 'SA' && t.division === 1).slice(0, 4);
+  const euDiv1 = clubTeams.filter(t => t.continent === 'EU' && t.division === 1).slice(0, 4);
+  const naDiv1 = clubTeams.filter(t => t.continent === 'NA' && t.division === 1).slice(0, 4);
 
   const saMatches = generateGroupSchedule(saDiv1, currentWeek, 'CONTINENTAL', true);
   const euMatches = generateGroupSchedule(euDiv1, currentWeek, 'CONTINENTAL', true);
+  const naMatches = generateGroupSchedule(naDiv1, currentWeek, 'CONTINENTAL', true);
   
-  allMatches.push(...saMatches, ...euMatches);
+  allMatches.push(...saMatches, ...euMatches, ...naMatches);
   
   // PHASE 5: CONTINENTAL SECONDARY (Sul-Americana / Europa League)
   // Top 4 from Div 2 of each continent
-  const saDiv2 = teams.filter(t => t.continent === 'SA' && t.division === 2).slice(0, 4);
-  const euDiv2 = teams.filter(t => t.continent === 'EU' && t.division === 2).slice(0, 4);
+  const saDiv2 = clubTeams.filter(t => t.continent === 'SA' && t.division === 2).slice(0, 4);
+  const euDiv2 = clubTeams.filter(t => t.continent === 'EU' && t.division === 2).slice(0, 4);
+  const naDiv2 = clubTeams.filter(t => t.continent === 'NA' && t.division === 2).slice(0, 4);
 
   const saSecMatches = generateGroupSchedule(saDiv2, currentWeek, 'CONTINENTAL_SECONDARY', true);
   const euSecMatches = generateGroupSchedule(euDiv2, currentWeek, 'CONTINENTAL_SECONDARY', true);
+  const naSecMatches = generateGroupSchedule(naDiv2, currentWeek, 'CONTINENTAL_SECONDARY', true);
   
-  allMatches.push(...saSecMatches, ...euSecMatches);
+  allMatches.push(...saSecMatches, ...euSecMatches, ...naSecMatches);
+
+  const continentalMatches = [
+    ...saMatches, ...euMatches, ...naMatches,
+    ...saSecMatches, ...euSecMatches, ...naSecMatches
+  ];
+  
+  const maxContinentalWeeks = continentalMatches.length > 0 
+    ? Math.max(...continentalMatches.map(m => m.week)) 
+    : currentWeek;
+
+  currentWeek = maxContinentalWeeks + 1;
+
+  // PHASE 6: WORLD CUP
+  if (nationalTeams.length > 0) {
+    const wcMatches = generateGroupSchedule(nationalTeams, currentWeek, 'WORLD_CUP', false);
+    allMatches.push(...wcMatches);
+  }
 
   return allMatches.sort((a, b) => a.week - b.week);
 };

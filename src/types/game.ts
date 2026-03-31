@@ -1,6 +1,6 @@
 export type Position = 'GK' | 'DEF' | 'MID' | 'ATK';
 export type MatchEventType = 'GOAL' | 'YELLOW_CARD' | 'RED_CARD' | 'SUBSTITUTION' | 'OFFSIDE';
-export type Competition = 'LEAGUE' | 'REGIONAL' | 'NATIONAL_CUP' | 'CONTINENTAL' | 'CONTINENTAL_SECONDARY';
+export type Competition = 'LEAGUE' | 'REGIONAL' | 'NATIONAL_CUP' | 'CONTINENTAL' | 'CONTINENTAL_SECONDARY' | 'WORLD_CUP';
 export type GameMode = 'manager' | 'player';
 
 export interface Stadium {
@@ -26,6 +26,16 @@ export interface Player {
   redCards: number;
   value: number;
   salary: number;
+  // New fields for Career Mode
+  nationality?: string;
+  preferredFoot?: 'Left' | 'Right' | 'Both';
+  height?: number; // in cm
+  weight?: number; // in kg
+  jerseyNumber?: number;
+  nationalTeamId?: string | null;
+  careerGoals?: number;
+  careerAssists?: number;
+  careerMatches?: number;
 }
 
 export interface TeamStats {
@@ -52,7 +62,7 @@ export interface Team {
   division: number; // 1, 2, 3, 4
   country: string; // 'BR', 'ENG', 'ESP', etc.
   state: string; // 'SP', 'RJ', etc.
-  continent: 'SA' | 'EU';
+  continent: 'SA' | 'EU' | 'NA';
   
   // Stats per competition
   stats: Record<Competition, TeamStats>;
@@ -90,4 +100,6 @@ export interface GameState {
   isGameOver: boolean;
   marketPlayers: Player[];
   activeMatchId: string | null;
+  managerReputation: number; // 0 to 100
+  jobOffers: string[]; // Array of team IDs
 }

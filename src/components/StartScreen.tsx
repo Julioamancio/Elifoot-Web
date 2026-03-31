@@ -2,17 +2,39 @@ import React, { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { generateTeams } from '../game/generator';
 import { AuthButton } from './AuthButton';
-import { GameMode } from '../types/game';
+import { GameMode, Player } from '../types/game';
 import { User, Briefcase, ChevronRight } from 'lucide-react';
 
 interface StartScreenProps {
-  onStart: (name: string, mode: GameMode, teamName?: string) => void;
+  onStart: (name: string, mode: GameMode, teamName?: string, playerDetails?: Partial<Player>) => void;
 }
 
 export function StartScreen({ onStart }: StartScreenProps) {
   const [teams] = useState(() => generateTeams());
   const [mode, setMode] = useState<GameMode | null>(null);
   const [playerName, setPlayerName] = useState('');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+  const [playerDetails, setPlayerDetails] = useState<Partial<Player>>({
+    age: 18,
+    position: 'ATK',
+    nationality: 'BR',
+    preferredFoot: 'Right',
+    height: 180,
+    weight: 75,
+    jerseyNumber: 10,
+  });
+
+  const getAvailableTeams = () => {
+    const maxDivByCountry: Record<string, number> = {};
+    teams.forEach(t => {
+      if (!maxDivByCountry[t.country] || t.division > maxDivByCountry[t.country]) {
+        maxDivByCountry[t.country] = t.division;
+      }
+    });
+    return teams.filter(t => t.division === maxDivByCountry[t.country]);
+  };
+
+  const availableTeams = getAvailableTeams();
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
@@ -58,7 +80,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
                 <button onClick={() => setMode(null)} className="text-sm text-slate-400 hover:text-slate-200">Voltar</button>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-                {teams.map(team => (
+                {availableTeams.map(team => (
                   <button
                     key={team.id}
                     onClick={() => onStart('Manager', 'manager', team.name)}
@@ -75,21 +97,137 @@ export function StartScreen({ onStart }: StartScreenProps) {
                 <h2 className="text-xl font-semibold text-slate-200">Crie seu Jogador</h2>
                 <button onClick={() => setMode(null)} className="text-sm text-slate-400 hover:text-slate-200">Voltar</button>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                 <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">Nome do Jogador</label>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Nome do Jogador</label>
                   <input
                     type="text"
                     value={playerName}
                     onChange={(e) => setPlayerName(e.target.value)}
                     placeholder="Ex: Pelé, Zico, Ronaldo..."
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Idade</label>
+                    <input
+                      type="number"
+                      min="16"
+                      max="35"
+                      value={playerDetails.age}
+                      onChange={(e) => setPlayerDetails({...playerDetails, age: parseInt(e.target.value)})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Nacionalidade</label>
+                    <select
+                      value={playerDetails.nationality}
+                      onChange={(e) => setPlayerDetails({...playerDetails, nationality: e.target.value})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="BR">Brasil</option>
+                      <option value="AR">Argentina</option>
+                      <option value="UY">Uruguai</option>
+                      <option value="CL">Chile</option>
+                      <option value="CO">Colômbia</option>
+                      <option value="PE">Peru</option>
+                      <option value="EC">Equador</option>
+                      <option value="PY">Paraguai</option>
+                      <option value="BO">Bolívia</option>
+                      <option value="VE">Venezuela</option>
+                      <option value="US">Estados Unidos</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Posição</label>
+                    <select
+                      value={playerDetails.position}
+                      onChange={(e) => setPlayerDetails({...playerDetails, position: e.target.value as any})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="GK">Goleiro (GK)</option>
+                      <option value="DEF">Defensor (DEF)</option>
+                      <option value="MID">Meio-Campo (MID)</option>
+                      <option value="ATK">Atacante (ATK)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Perna Boa</label>
+                    <select
+                      value={playerDetails.preferredFoot}
+                      onChange={(e) => setPlayerDetails({...playerDetails, preferredFoot: e.target.value as any})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="Right">Direita</option>
+                      <option value="Left">Esquerda</option>
+                      <option value="Both">Ambas</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Altura (cm)</label>
+                    <input
+                      type="number"
+                      min="150"
+                      max="220"
+                      value={playerDetails.height}
+                      onChange={(e) => setPlayerDetails({...playerDetails, height: parseInt(e.target.value)})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Peso (kg)</label>
+                    <input
+                      type="number"
+                      min="50"
+                      max="120"
+                      value={playerDetails.weight}
+                      onChange={(e) => setPlayerDetails({...playerDetails, weight: parseInt(e.target.value)})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Camisa</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="99"
+                      value={playerDetails.jerseyNumber}
+                      onChange={(e) => setPlayerDetails({...playerDetails, jerseyNumber: parseInt(e.target.value)})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Time Inicial (4ª Divisão)</label>
+                    <select
+                      value={selectedTeamId}
+                      onChange={(e) => setSelectedTeamId(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Aleatório</option>
+                      {availableTeams
+                        .filter(t => t.country === playerDetails.nationality)
+                        .map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
                 <button
-                  onClick={() => onStart(playerName || 'Jogador Desconhecido', 'player')}
+                  onClick={() => onStart(playerName || 'Jogador Desconhecido', 'player', selectedTeamId || undefined, playerDetails)}
                   disabled={!playerName.trim()}
-                  className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-4 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
+                  className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-4 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 mt-4"
                 >
                   Começar Carreira <ChevronRight className="w-5 h-5" />
                 </button>
