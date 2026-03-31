@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: saves
+    // Document ID: {userId} (must match authenticated user's UID)
+    // Fields:
+    //   - teams: list (required) - List of all teams in the game.
+    //   - matches: list (required) - List of all matches in the season.
+    //   - currentWeek: number (required) - The current week of the season.
+    //   - userTeamId: string (required) - The ID of the team controlled by the user.
+    //   - isGameOver: boolean (required) - Whether the season is over.
+    //   - updatedAt: timestamp (required) - Timestamp of the last save.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+       return request.auth != null;
+    }
+
+    function isOwner(userId) {
+       return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRequiredFields(fields) {
+       return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidGameState(data) {
+      return hasRequiredFields(['teams', 'matches', 'currentWeek', 'userTeamId', 'isGameOver', 'updatedAt']) &&
+             data.teams is list &&
+             data.matches is list &&
+             data.currentWeek is number && data.currentWeek >= 1 &&
+             data.userTeamId is string && data.userTeamId.size() > 0 && data.userTeamId.size() < 100 &&
+             data.isGameOver is bool &&
+             data.updatedAt is timestamp;
+    }
+
+    match /saves/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidGameState(request.resource.data);
+      allow update: if isOwner(userId) && isValidGameState(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+  }
+}
