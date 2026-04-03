@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { generateTeams } from '../game/generator';
 import { AuthButton } from './AuthButton';
 import { GameMode, Player } from '../types/game';
 import { User, Briefcase, ChevronRight } from 'lucide-react';
 import startScreenBg from '../assets/start-screen-bg.png';
 import futbossLogo from '../assets/futboss-logo.png';
+import type { AuthUser } from '../lib/api';
 
 interface StartScreenProps {
   onStart: (name: string, mode: GameMode, teamName?: string, playerDetails?: Partial<Player>) => void;
@@ -13,6 +14,8 @@ interface StartScreenProps {
 export function StartScreen({ onStart }: StartScreenProps) {
   const [teams] = useState(() => generateTeams());
   const [mode, setMode] = useState<GameMode | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [isAuthBootstrapping, setIsAuthBootstrapping] = useState(true);
   const [playerName, setPlayerName] = useState('');
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
   const [playerDetails, setPlayerDetails] = useState<Partial<Player>>({
@@ -39,6 +42,14 @@ export function StartScreen({ onStart }: StartScreenProps) {
       return teamA.name.localeCompare(teamB.name);
     });
 
+  const isAuthenticated = Boolean(authUser);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setMode(null);
+    }
+  }, [isAuthenticated]);
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950">
       <div
@@ -59,11 +70,41 @@ export function StartScreen({ onStart }: StartScreenProps) {
             <p className="mb-6 max-w-xl text-slate-300">
               O classico simulador de futebol, agora com mais opcoes de carreira, competicoes e evolucao.
             </p>
-            <AuthButton />
+            <AuthButton
+              onAuthStateChange={({ user, isBootstrapping }) => {
+                setAuthUser(user);
+                setIsAuthBootstrapping(isBootstrapping);
+              }}
+            />
           </div>
 
           <div className="p-8">
-            {!mode ? (
+            {!isAuthenticated ? (
+              <div className="rounded-2xl border border-slate-700 bg-slate-800/70 p-6 text-center">
+                <h2 className="text-2xl font-bold text-slate-100">Entre para liberar sua carreira</h2>
+                <p className="mt-3 text-sm leading-6 text-slate-400">
+                  Faca login ou crie sua conta para iniciar uma carreira de tecnico ou jogador e salvar seu progresso.
+                </p>
+                {!isAuthBootstrapping ? (
+                  <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-5 text-center opacity-75">
+                      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+                        <Briefcase className="h-7 w-7" />
+                      </div>
+                      <p className="text-lg font-bold text-slate-200">Carreira Manager</p>
+                      <p className="mt-2 text-sm text-slate-400">Disponivel apos entrar na sua conta.</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-5 text-center opacity-75">
+                      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/20 text-blue-400">
+                        <User className="h-7 w-7" />
+                      </div>
+                      <p className="text-lg font-bold text-slate-200">Carreira Jogador</p>
+                      <p className="mt-2 text-sm text-slate-400">Disponivel apos entrar na sua conta.</p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : !mode ? (
               <>
                 <h2 className="mb-8 text-center text-2xl font-bold text-slate-200">Escolha seu Caminho</h2>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -97,7 +138,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
             ) : mode === 'manager' ? (
               <>
                 <div className="mb-6 flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-slate-200">Escolha seu clube ou comece no aleatorio</h2>
+                  <h2 className="text-xl font-semibold text-slate-200">Seu clube sera sorteado automaticamente</h2>
                   <button onClick={() => setMode(null)} className="text-sm text-slate-400 hover:text-slate-200">
                     Voltar
                   </button>
@@ -105,22 +146,13 @@ export function StartScreen({ onStart }: StartScreenProps) {
 
                 <button
                   onClick={() => onStart('Manager', 'manager')}
-                  className="mb-4 w-full rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-300 transition-all hover:bg-emerald-500/20 hover:text-emerald-200"
+                  className="w-full rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-4 text-sm font-bold text-emerald-300 transition-all hover:bg-emerald-500/20 hover:text-emerald-200"
                 >
                   Sortear Clube e Comecar
                 </button>
-
-                <div className="custom-scrollbar grid max-h-96 grid-cols-2 gap-3 overflow-y-auto pr-2 sm:grid-cols-3 md:grid-cols-4">
-                  {availableTeams.map(team => (
-                    <button
-                      key={team.id}
-                      onClick={() => onStart('Manager', 'manager', team.name)}
-                      className="rounded-xl border border-slate-700 bg-slate-800 p-3 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-emerald-500 hover:bg-emerald-700 hover:text-white"
-                    >
-                      {team.name}
-                    </button>
-                  ))}
-                </div>
+                <p className="mt-4 text-sm leading-6 text-slate-400">
+                  O jogo vai escolher um clube aleatorio entre a 1a e a 4a divisao para iniciar sua carreira de tecnico.
+                </p>
               </>
             ) : (
               <div className="mx-auto max-w-md">

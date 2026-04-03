@@ -39,7 +39,11 @@ type CareerModalMode = 'save' | 'load';
 
 const getActiveSlotStorageKey = (userId: number) => `elifoot_active_slot_${userId}`;
 
-export const AuthButton: React.FC = () => {
+interface AuthButtonProps {
+  onAuthStateChange?: (state: { user: AuthUser | null; isBootstrapping: boolean }) => void;
+}
+
+export const AuthButton: React.FC<AuthButtonProps> = ({ onAuthStateChange }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
@@ -78,6 +82,7 @@ export const AuthButton: React.FC = () => {
   const recentRoundSummary = useGameStore(state => state.recentRoundSummary);
   const seasonReview = useGameStore(state => state.seasonReview);
   const setGameState = useGameStore(state => state.setGameState);
+  const resetGame = useGameStore(state => state.resetGame);
 
   const userTeam = teams.find(team => team.id === userTeamId);
   const userPlayer = userTeam?.players.find(player => player.id === userPlayerId);
@@ -199,6 +204,10 @@ export const AuthButton: React.FC = () => {
   }, [feedback]);
 
   useEffect(() => {
+    onAuthStateChange?.({ user, isBootstrapping });
+  }, [user, isBootstrapping, onAuthStateChange]);
+
+  useEffect(() => {
     if (!careerModalMode) return;
     setSlotNameInput(derivedSlotName);
   }, [careerModalMode, derivedSlotName]);
@@ -229,6 +238,7 @@ export const AuthButton: React.FC = () => {
       persistActiveSlotId(user, null);
     }
 
+    resetGame();
     clearStoredToken();
     setUser(null);
     setPassword('');
@@ -236,6 +246,8 @@ export const AuthButton: React.FC = () => {
     setSaveSlots([]);
     setActiveSlotId(null);
     setCareerModalMode(null);
+    setEditingSlotId(null);
+    setDeletingSlotId(null);
   };
 
   const openCareerModal = async (nextMode: CareerModalMode) => {
