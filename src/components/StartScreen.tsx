@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useGameStore } from '../store/useGameStore';
 import { generateTeams } from '../game/generator';
 import { AuthButton } from './AuthButton';
 import { GameMode, Player } from '../types/game';
 import { User, Briefcase, ChevronRight } from 'lucide-react';
 import startScreenBg from '../assets/start-screen-bg.png';
+import futbossLogo from '../assets/futboss-logo.png';
 
 interface StartScreenProps {
   onStart: (name: string, mode: GameMode, teamName?: string, playerDetails?: Partial<Player>) => void;
@@ -27,12 +27,12 @@ export function StartScreen({ onStart }: StartScreenProps) {
 
   const getAvailableTeams = () => {
     const topDivByCountry: Record<string, number> = {};
-    teams.forEach(t => {
-      if (!topDivByCountry[t.country] || t.division < topDivByCountry[t.country]) {
-        topDivByCountry[t.country] = t.division;
+    teams.forEach(team => {
+      if (!topDivByCountry[team.country] || team.division < topDivByCountry[team.country]) {
+        topDivByCountry[team.country] = team.division;
       }
     });
-    return teams.filter(t => t.division === topDivByCountry[t.country]);
+    return teams.filter(team => team.division === topDivByCountry[team.country]);
   };
 
   const availableTeams = getAvailableTeams();
@@ -45,205 +45,236 @@ export function StartScreen({ onStart }: StartScreenProps) {
       />
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950/88 via-slate-950/76 to-emerald-950/72" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_34%),radial-gradient(circle_at_bottom,rgba(16,185,129,0.24),transparent_30%)]" />
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-4">
-      <div className="max-w-3xl w-full bg-slate-900/78 rounded-3xl shadow-[0_30px_90px_rgba(2,6,23,0.78)] overflow-hidden border border-white/10 backdrop-blur-md">
-        <div className="p-8 text-center border-b border-slate-800 flex flex-col items-center">
-          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500 tracking-tighter mb-2">FUTBOSS</h1>
-          <p className="text-slate-400 mb-6">O clássico simulador de futebol, agora com mais opções.</p>
-          <AuthButton />
-        </div>
-        
-        <div className="p-8">
-          {!mode ? (
-            <>
-              <h2 className="text-2xl font-bold text-slate-200 mb-8 text-center">Escolha seu Caminho</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <button
-                  onClick={() => setMode('manager')}
-                  className="group relative overflow-hidden bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 p-8 rounded-2xl transition-all text-left flex flex-col items-center text-center"
-                >
-                  <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Briefcase className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-100 mb-2">Carreira Manager</h3>
-                  <p className="text-slate-400 text-sm">Assuma o controle de um clube. Gerencie finanças, estádio, táticas e o mercado de transferências.</p>
-                </button>
 
-                <button
-                  onClick={() => setMode('player')}
-                  className="group relative overflow-hidden bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-500 p-8 rounded-2xl transition-all text-left flex flex-col items-center text-center"
-                >
-                  <div className="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <User className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-100 mb-2">Carreira Jogador</h3>
-                  <p className="text-slate-400 text-sm">Crie seu jogador, comece na 4ª divisão e treine para se tornar uma lenda do futebol mundial.</p>
-                </button>
-              </div>
-            </>
-          ) : mode === 'manager' ? (
-            <>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-slate-200">Escolha seu clube para começar</h2>
-                <button onClick={() => setMode(null)} className="text-sm text-slate-400 hover:text-slate-200">Voltar</button>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-                {availableTeams.map(team => (
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8">
+        <div className="max-w-3xl w-full overflow-hidden rounded-3xl border border-white/10 bg-slate-900/78 shadow-[0_30px_90px_rgba(2,6,23,0.78)] backdrop-blur-md">
+          <div className="flex flex-col items-center border-b border-slate-800 p-8 text-center">
+          <img
+            src={futbossLogo}
+            alt="Logo do FutBoss"
+            className="mb-5 h-40 w-40 rounded-full border border-white/10 bg-slate-950/60 object-cover shadow-[0_22px_48px_rgba(15,23,42,0.6)] sm:h-48 sm:w-48"
+          />
+          <p className="mb-6 max-w-xl text-slate-300">
+            O classico simulador de futebol, agora com mais opcoes de carreira, competicoes e evolucao.
+          </p>
+            <AuthButton />
+          </div>
+
+          <div className="p-8">
+            {!mode ? (
+              <>
+                <h2 className="mb-8 text-center text-2xl font-bold text-slate-200">Escolha seu Caminho</h2>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <button
-                    key={team.id}
-                    onClick={() => onStart('Manager', 'manager', team.name)}
-                    className="p-3 bg-slate-800 hover:bg-emerald-700 hover:text-white text-slate-300 rounded-xl text-sm font-medium transition-all duration-200 border border-slate-700 hover:border-emerald-500"
+                    onClick={() => setMode('manager')}
+                    className="group relative flex flex-col items-center overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-8 text-left text-center transition-all hover:border-emerald-500 hover:bg-slate-700"
                   >
-                    {team.name}
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 transition-transform group-hover:scale-110">
+                      <Briefcase className="h-8 w-8" />
+                    </div>
+                    <h3 className="mb-2 text-2xl font-bold text-slate-100">Carreira Manager</h3>
+                    <p className="text-sm text-slate-400">
+                      Assuma o controle de um clube. Gerencie financas, estadio, taticas e o mercado de transferencias.
+                    </p>
                   </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="max-w-md mx-auto">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-slate-200">Crie seu Jogador</h2>
-                <button onClick={() => setMode(null)} className="text-sm text-slate-400 hover:text-slate-200">Voltar</button>
-              </div>
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Nome do Jogador</label>
-                  <input
-                    type="text"
-                    value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
-                    placeholder="Ex: Pelé, Zico, Ronaldo..."
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Idade</label>
-                    <input
-                      type="number"
-                      min="16"
-                      max="35"
-                      value={playerDetails.age}
-                      onChange={(e) => setPlayerDetails({...playerDetails, age: parseInt(e.target.value)})}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Nacionalidade</label>
-                    <select
-                      value={playerDetails.nationality}
-                      onChange={(e) => setPlayerDetails({...playerDetails, nationality: e.target.value})}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="BR">Brasil</option>
-                      <option value="AR">Argentina</option>
-                      <option value="UY">Uruguai</option>
-                      <option value="CL">Chile</option>
-                      <option value="CO">Colômbia</option>
-                      <option value="PE">Peru</option>
-                      <option value="EC">Equador</option>
-                      <option value="PY">Paraguai</option>
-                      <option value="BO">Bolívia</option>
-                      <option value="VE">Venezuela</option>
-                      <option value="US">Estados Unidos</option>
-                    </select>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Posição</label>
-                    <select
-                      value={playerDetails.position}
-                      onChange={(e) => setPlayerDetails({...playerDetails, position: e.target.value as any})}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="GK">Goleiro (GK)</option>
-                      <option value="DEF">Defensor (DEF)</option>
-                      <option value="MID">Meio-Campo (MID)</option>
-                      <option value="ATK">Atacante (ATK)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Perna Boa</label>
-                    <select
-                      value={playerDetails.preferredFoot}
-                      onChange={(e) => setPlayerDetails({...playerDetails, preferredFoot: e.target.value as any})}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="Right">Direita</option>
-                      <option value="Left">Esquerda</option>
-                      <option value="Both">Ambas</option>
-                    </select>
-                  </div>
+                  <button
+                    onClick={() => setMode('player')}
+                    className="group relative flex flex-col items-center overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-8 text-left text-center transition-all hover:border-blue-500 hover:bg-slate-700"
+                  >
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/20 text-blue-400 transition-transform group-hover:scale-110">
+                      <User className="h-8 w-8" />
+                    </div>
+                    <h3 className="mb-2 text-2xl font-bold text-slate-100">Carreira Jogador</h3>
+                    <p className="text-sm text-slate-400">
+                      Crie seu jogador, comece na quarta divisao e treine para se tornar uma lenda do futebol mundial.
+                    </p>
+                  </button>
                 </div>
+              </>
+            ) : mode === 'manager' ? (
+              <>
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-slate-200">Escolha seu clube para comecar</h2>
+                  <button onClick={() => setMode(null)} className="text-sm text-slate-400 hover:text-slate-200">
+                    Voltar
+                  </button>
+                </div>
+                <div className="custom-scrollbar grid max-h-96 grid-cols-2 gap-3 overflow-y-auto pr-2 sm:grid-cols-3 md:grid-cols-4">
+                  {availableTeams.map(team => (
+                    <button
+                      key={team.id}
+                      onClick={() => onStart('Manager', 'manager', team.name)}
+                      className="rounded-xl border border-slate-700 bg-slate-800 p-3 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-emerald-500 hover:bg-emerald-700 hover:text-white"
+                    >
+                      {team.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="mx-auto max-w-md">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-slate-200">Crie seu Jogador</h2>
+                  <button onClick={() => setMode(null)} className="text-sm text-slate-400 hover:text-slate-200">
+                    Voltar
+                  </button>
+                </div>
+                <div className="custom-scrollbar max-h-[60vh] space-y-4 overflow-y-auto pr-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-400">Nome do Jogador</label>
+                    <input
+                      type="text"
+                      value={playerName}
+                      onChange={event => setPlayerName(event.target.value)}
+                      placeholder="Ex: Pele, Zico, Ronaldo..."
+                      className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Altura (cm)</label>
-                    <input
-                      type="number"
-                      min="150"
-                      max="220"
-                      value={playerDetails.height}
-                      onChange={(e) => setPlayerDetails({...playerDetails, height: parseInt(e.target.value)})}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-400">Idade</label>
+                      <input
+                        type="number"
+                        min="16"
+                        max="35"
+                        value={playerDetails.age}
+                        onChange={event => setPlayerDetails({ ...playerDetails, age: parseInt(event.target.value) })}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-400">Nacionalidade</label>
+                      <select
+                        value={playerDetails.nationality}
+                        onChange={event => setPlayerDetails({ ...playerDetails, nationality: event.target.value })}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="BR">Brasil</option>
+                        <option value="AR">Argentina</option>
+                        <option value="UY">Uruguai</option>
+                        <option value="CL">Chile</option>
+                        <option value="CO">Colombia</option>
+                        <option value="PE">Peru</option>
+                        <option value="EC">Equador</option>
+                        <option value="PY">Paraguai</option>
+                        <option value="BO">Bolivia</option>
+                        <option value="VE">Venezuela</option>
+                        <option value="US">Estados Unidos</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Peso (kg)</label>
-                    <input
-                      type="number"
-                      min="50"
-                      max="120"
-                      value={playerDetails.weight}
-                      onChange={(e) => setPlayerDetails({...playerDetails, weight: parseInt(e.target.value)})}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Camisa</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="99"
-                      value={playerDetails.jerseyNumber}
-                      onChange={(e) => setPlayerDetails({...playerDetails, jerseyNumber: parseInt(e.target.value)})}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Time Inicial (4ª Divisão)</label>
-                    <select
-                      value={selectedTeamId}
-                      onChange={(e) => setSelectedTeamId(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Aleatório</option>
-                      {availableTeams
-                        .filter(t => t.country === playerDetails.nationality)
-                        .map(t => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
 
-                <button
-                  onClick={() => onStart(playerName || 'Jogador Desconhecido', 'player', selectedTeamId || undefined, playerDetails)}
-                  disabled={!playerName.trim()}
-                  className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-4 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 mt-4"
-                >
-                  Começar Carreira <ChevronRight className="w-5 h-5" />
-                </button>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-400">Posicao</label>
+                      <select
+                        value={playerDetails.position}
+                        onChange={event => setPlayerDetails({ ...playerDetails, position: event.target.value as Player['position'] })}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="GK">Goleiro (GK)</option>
+                        <option value="DEF">Defensor (DEF)</option>
+                        <option value="MID">Meio-Campo (MID)</option>
+                        <option value="ATK">Atacante (ATK)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-400">Perna Boa</label>
+                      <select
+                        value={playerDetails.preferredFoot}
+                        onChange={event =>
+                          setPlayerDetails({
+                            ...playerDetails,
+                            preferredFoot: event.target.value as NonNullable<Player['preferredFoot']>,
+                          })
+                        }
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="Right">Direita</option>
+                        <option value="Left">Esquerda</option>
+                        <option value="Both">Ambas</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-400">Altura (cm)</label>
+                      <input
+                        type="number"
+                        min="150"
+                        max="220"
+                        value={playerDetails.height}
+                        onChange={event => setPlayerDetails({ ...playerDetails, height: parseInt(event.target.value) })}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-400">Peso (kg)</label>
+                      <input
+                        type="number"
+                        min="50"
+                        max="120"
+                        value={playerDetails.weight}
+                        onChange={event => setPlayerDetails({ ...playerDetails, weight: parseInt(event.target.value) })}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-400">Camisa</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="99"
+                        value={playerDetails.jerseyNumber}
+                        onChange={event => setPlayerDetails({ ...playerDetails, jerseyNumber: parseInt(event.target.value) })}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-400">Time Inicial (4a Divisao)</label>
+                      <select
+                        value={selectedTeamId}
+                        onChange={event => setSelectedTeamId(event.target.value)}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Aleatorio</option>
+                        {availableTeams
+                          .filter(team => team.country === playerDetails.nationality)
+                          .map(team => (
+                            <option key={team.id} value={team.id}>
+                              {team.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      onStart(playerName || 'Jogador Desconhecido', 'player', selectedTeamId || undefined, playerDetails)
+                    }
+                    disabled={!playerName.trim()}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 font-bold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Comecar Carreira <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+
+        <footer className="mt-6 text-center text-xs text-slate-300/90">
+          <p className="font-semibold tracking-[0.18em] text-slate-200">FUTBOSS</p>
+          <p className="mt-2">Desenvolvido por Julio Amancio.</p>
+          <p className="mt-1">© 2026 Julio Amancio. Todos os direitos reservados.</p>
+        </footer>
       </div>
     </div>
   );
