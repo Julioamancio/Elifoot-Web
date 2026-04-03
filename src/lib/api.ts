@@ -1,6 +1,15 @@
 import type { GameMode, GameState } from '../types/game';
 
 const TOKEN_STORAGE_KEY = 'elifoot_auth_token';
+const APP_BASE_PATH = (() => {
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  if (baseUrl === '/') return '';
+  return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+})();
+
+function withBasePath(path: string) {
+  return `${APP_BASE_PATH}${path.startsWith('/') ? path : `/${path}`}`;
+}
 
 export interface AuthUser {
   id: number;
@@ -80,7 +89,7 @@ async function apiRequest<T>(input: string, init?: RequestInit): Promise<T> {
 }
 
 export async function registerWithPassword(username: string, password: string) {
-  const response = await apiRequest<AuthResponse>('/api/auth/register', {
+  const response = await apiRequest<AuthResponse>(withBasePath('/api/auth/register'), {
     method: 'POST',
     body: JSON.stringify({ username, password }),
   });
@@ -90,7 +99,7 @@ export async function registerWithPassword(username: string, password: string) {
 }
 
 export async function loginWithPassword(username: string, password: string) {
-  const response = await apiRequest<AuthResponse>('/api/auth/login', {
+  const response = await apiRequest<AuthResponse>(withBasePath('/api/auth/login'), {
     method: 'POST',
     body: JSON.stringify({ username, password }),
   });
@@ -105,7 +114,7 @@ export async function getCurrentUser() {
   }
 
   try {
-    const response = await apiRequest<{ user: AuthUser }>('/api/auth/me');
+    const response = await apiRequest<{ user: AuthUser }>(withBasePath('/api/auth/me'));
     return response.user;
   } catch {
     return null;
@@ -113,14 +122,14 @@ export async function getCurrentUser() {
 }
 
 export async function listSaveSlots() {
-  return apiRequest<{ slots: SaveSlotSummary[] }>('/api/saves');
+  return apiRequest<{ slots: SaveSlotSummary[] }>(withBasePath('/api/saves'));
 }
 
 export async function saveGameState(
   gameState: GameState,
   options?: { slotId?: number; slotName?: string },
 ) {
-  return apiRequest<{ message: string; slot: SaveSlotSummary | null; updatedAt: string | null }>('/api/save', {
+  return apiRequest<{ message: string; slot: SaveSlotSummary | null; updatedAt: string | null }>(withBasePath('/api/save'), {
     method: 'PUT',
     body: JSON.stringify({
       gameState,
@@ -132,18 +141,18 @@ export async function saveGameState(
 
 export async function loadGameState(slotId?: number) {
   const query = slotId ? `?slotId=${slotId}` : '';
-  return apiRequest<LoadGameResponse>(`/api/save${query}`);
+  return apiRequest<LoadGameResponse>(withBasePath(`/api/save${query}`));
 }
 
 export async function renameSaveSlot(slotId: number, slotName: string) {
-  return apiRequest<{ message: string; slot: SaveSlotSummary | null }>(`/api/saves/${slotId}`, {
+  return apiRequest<{ message: string; slot: SaveSlotSummary | null }>(withBasePath(`/api/saves/${slotId}`), {
     method: 'PATCH',
     body: JSON.stringify({ slotName }),
   });
 }
 
 export async function deleteSaveSlot(slotId: number) {
-  return apiRequest<{ message: string }>(`/api/saves/${slotId}`, {
+  return apiRequest<{ message: string }>(withBasePath(`/api/saves/${slotId}`), {
     method: 'DELETE',
   });
 }

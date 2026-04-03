@@ -25,17 +25,19 @@ export function StartScreen({ onStart }: StartScreenProps) {
     jerseyNumber: 10,
   });
 
-  const getAvailableTeams = () => {
-    const topDivByCountry: Record<string, number> = {};
-    teams.forEach(team => {
-      if (!topDivByCountry[team.country] || team.division < topDivByCountry[team.country]) {
-        topDivByCountry[team.country] = team.division;
+  const availableTeams = teams
+    .filter(team => team.division > 0)
+    .sort((teamA, teamB) => {
+      if (teamA.country !== teamB.country) {
+        return teamA.country.localeCompare(teamB.country);
       }
-    });
-    return teams.filter(team => team.division === topDivByCountry[team.country]);
-  };
 
-  const availableTeams = getAvailableTeams();
+      if (teamA.division !== teamB.division) {
+        return teamA.division - teamB.division;
+      }
+
+      return teamA.name.localeCompare(teamB.name);
+    });
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950">
@@ -47,16 +49,16 @@ export function StartScreen({ onStart }: StartScreenProps) {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_34%),radial-gradient(circle_at_bottom,rgba(16,185,129,0.24),transparent_30%)]" />
 
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8">
-        <div className="max-w-3xl w-full overflow-hidden rounded-3xl border border-white/10 bg-slate-900/78 shadow-[0_30px_90px_rgba(2,6,23,0.78)] backdrop-blur-md">
+        <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/78 shadow-[0_30px_90px_rgba(2,6,23,0.78)] backdrop-blur-md">
           <div className="flex flex-col items-center border-b border-slate-800 p-8 text-center">
-          <img
-            src={futbossLogo}
-            alt="Logo do FutBoss"
-            className="mb-5 h-40 w-40 rounded-full border border-white/10 bg-slate-950/60 object-cover shadow-[0_22px_48px_rgba(15,23,42,0.6)] sm:h-48 sm:w-48"
-          />
-          <p className="mb-6 max-w-xl text-slate-300">
-            O classico simulador de futebol, agora com mais opcoes de carreira, competicoes e evolucao.
-          </p>
+            <img
+              src={futbossLogo}
+              alt="Logo do FutBoss"
+              className="mb-5 h-40 w-40 rounded-full border border-white/10 bg-slate-950/60 object-cover shadow-[0_22px_48px_rgba(15,23,42,0.6)] sm:h-48 sm:w-48"
+            />
+            <p className="mb-6 max-w-xl text-slate-300">
+              O classico simulador de futebol, agora com mais opcoes de carreira, competicoes e evolucao.
+            </p>
             <AuthButton />
           </div>
 
@@ -67,7 +69,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <button
                     onClick={() => setMode('manager')}
-                    className="group relative flex flex-col items-center overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-8 text-left text-center transition-all hover:border-emerald-500 hover:bg-slate-700"
+                    className="group relative flex flex-col items-center overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-8 text-center transition-all hover:border-emerald-500 hover:bg-slate-700"
                   >
                     <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 transition-transform group-hover:scale-110">
                       <Briefcase className="h-8 w-8" />
@@ -80,14 +82,14 @@ export function StartScreen({ onStart }: StartScreenProps) {
 
                   <button
                     onClick={() => setMode('player')}
-                    className="group relative flex flex-col items-center overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-8 text-left text-center transition-all hover:border-blue-500 hover:bg-slate-700"
+                    className="group relative flex flex-col items-center overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-8 text-center transition-all hover:border-blue-500 hover:bg-slate-700"
                   >
                     <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/20 text-blue-400 transition-transform group-hover:scale-110">
                       <User className="h-8 w-8" />
                     </div>
                     <h3 className="mb-2 text-2xl font-bold text-slate-100">Carreira Jogador</h3>
                     <p className="text-sm text-slate-400">
-                      Crie seu jogador, comece na quarta divisao e treine para se tornar uma lenda do futebol mundial.
+                      Crie seu jogador, comece em um clube aleatorio da primeira a quarta divisao e evolua ate se tornar uma lenda do futebol mundial.
                     </p>
                   </button>
                 </div>
@@ -95,11 +97,19 @@ export function StartScreen({ onStart }: StartScreenProps) {
             ) : mode === 'manager' ? (
               <>
                 <div className="mb-6 flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-slate-200">Escolha seu clube para comecar</h2>
+                  <h2 className="text-xl font-semibold text-slate-200">Escolha seu clube ou comece no aleatorio</h2>
                   <button onClick={() => setMode(null)} className="text-sm text-slate-400 hover:text-slate-200">
                     Voltar
                   </button>
                 </div>
+
+                <button
+                  onClick={() => onStart('Manager', 'manager')}
+                  className="mb-4 w-full rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-300 transition-all hover:bg-emerald-500/20 hover:text-emerald-200"
+                >
+                  Sortear Clube e Comecar
+                </button>
+
                 <div className="custom-scrollbar grid max-h-96 grid-cols-2 gap-3 overflow-y-auto pr-2 sm:grid-cols-3 md:grid-cols-4">
                   {availableTeams.map(team => (
                     <button
@@ -120,6 +130,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
                     Voltar
                   </button>
                 </div>
+
                 <div className="custom-scrollbar max-h-[60vh] space-y-4 overflow-y-auto pr-2">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-400">Nome do Jogador</label>
@@ -237,33 +248,44 @@ export function StartScreen({ onStart }: StartScreenProps) {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-slate-400">Time Inicial (4a Divisao)</label>
+                      <label className="mb-1 block text-sm font-medium text-slate-400">Clube Inicial (1a a 4a Divisao)</label>
                       <select
                         value={selectedTeamId}
                         onChange={event => setSelectedTeamId(event.target.value)}
                         className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       >
-                        <option value="">Aleatorio</option>
-                        {availableTeams
-                          .filter(team => team.country === playerDetails.nationality)
-                          .map(team => (
-                            <option key={team.id} value={team.id}>
-                              {team.name}
-                            </option>
-                          ))}
+                        <option value="">Escolher manualmente</option>
+                        {availableTeams.map(team => (
+                          <option key={team.id} value={team.id}>
+                            {team.name} - {team.country} - {team.division}a divisao
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() =>
-                      onStart(playerName || 'Jogador Desconhecido', 'player', selectedTeamId || undefined, playerDetails)
-                    }
-                    disabled={!playerName.trim()}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 font-bold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Comecar Carreira <ChevronRight className="h-5 w-5" />
-                  </button>
+                  <p className="text-xs text-slate-500">
+                    Se nao escolher um clube, o jogo sorteara automaticamente um time entre a 1a e a 4a divisao.
+                  </p>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <button
+                      onClick={() => onStart(playerName || 'Jogador Desconhecido', 'player', undefined, playerDetails)}
+                      disabled={!playerName.trim()}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-400/35 bg-blue-500/10 px-6 py-4 font-bold text-blue-200 transition-colors hover:bg-blue-500/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Sortear Clube <ChevronRight className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() =>
+                        onStart(playerName || 'Jogador Desconhecido', 'player', selectedTeamId || undefined, playerDetails)
+                      }
+                      disabled={!playerName.trim()}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 font-bold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Comecar Carreira <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -273,7 +295,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
         <footer className="mt-6 text-center text-xs text-slate-300/90">
           <p className="font-semibold tracking-[0.18em] text-slate-200">FUTBOSS</p>
           <p className="mt-2">Desenvolvido por Julio Amancio.</p>
-          <p className="mt-1">© 2026. Todos os direitos reservados.</p>
+          <p className="mt-1">Todos os direitos reservados • 2026</p>
         </footer>
       </div>
     </div>

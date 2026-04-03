@@ -265,25 +265,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const teams = generateTeams();
     const currentYear = DEFAULT_START_YEAR;
     const internationalCompetitions = getInternationalCompetitionsForYear(currentYear);
+    const domesticTeams = teams.filter(team => team.division > 0);
     let userTeamId = null;
     let userPlayerId = null;
 
-    if (mode === 'manager' && teamName) {
-      const userTeam = teams.find(t => t.name === teamName);
+    if (mode === 'manager') {
+      const userTeam =
+        (teamName ? teams.find(t => t.name === teamName) : null) ??
+        (domesticTeams.length > 0
+          ? domesticTeams[Math.floor(Math.random() * domesticTeams.length)]
+          : null);
       if (userTeam) {
         userTeam.isUserControlled = true;
         userTeamId = userTeam.id;
       }
     } else if (mode === 'player') {
-      // Create a player and assign to a random lowest division team of their nationality
-      const nationality = playerDetails?.nationality || 'BR';
-      const countryTeams = teams.filter(t => t.country === nationality);
-      const maxDiv = Math.max(...countryTeams.map(t => t.division));
-      const lowestDivTeams = countryTeams.filter(t => t.division === maxDiv);
-      
+      // Create a player and assign to a random domestic club across divisions 1-4
       let selectedTeam = teamName ? teams.find(t => t.id === teamName) : null;
       if (!selectedTeam) {
-        selectedTeam = lowestDivTeams[Math.floor(Math.random() * lowestDivTeams.length)];
+        selectedTeam =
+          domesticTeams.length > 0
+            ? domesticTeams[Math.floor(Math.random() * domesticTeams.length)]
+            : null;
       }
       
       const createdPlayer: Player = {
