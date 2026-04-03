@@ -273,7 +273,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
         <footer className="mt-6 text-center text-xs text-slate-300/90">
           <p className="font-semibold tracking-[0.18em] text-slate-200">FUTBOSS</p>
           <p className="mt-2">Desenvolvido por Julio Amancio.</p>
-          <p className="mt-1">© 2026 Julio Amancio. Todos os direitos reservados.</p>
+          <p className="mt-1">© 2026. Todos os direitos reservados.</p>
         </footer>
       </div>
     </div>
