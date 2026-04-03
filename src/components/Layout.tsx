@@ -58,7 +58,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
       <aside className="flex w-full flex-col border-r border-slate-800 bg-slate-950 md:w-64">
         <div className="border-b border-slate-800 p-6">
           <h1 className="bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-2xl font-black tracking-tight text-transparent">
-            ELIFOOT WEB
+              FUTBOSS
           </h1>
           <div className="mt-4">
             {gameMode === 'player' && userPlayer ? (

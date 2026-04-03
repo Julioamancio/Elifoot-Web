@@ -1,6 +1,6 @@
-# Elifoot Web
+# FutBoss
 
-Versão web inspirada no Elifoot, com modo carreira de técnico e jogador, calendário, mercado, finanças, competições nacionais e internacionais, além de persistência local com múltiplos slots de save por usuário.
+Versão web inspirada nos clássicos managers de futebol, com modo carreira de técnico e jogador, calendário, mercado, finanças, competições nacionais e internacionais, além de persistência local com múltiplos slots de save por usuário.
 
 ## Stack
 

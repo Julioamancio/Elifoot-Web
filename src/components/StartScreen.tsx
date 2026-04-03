@@ -4,6 +4,7 @@ import { generateTeams } from '../game/generator';
 import { AuthButton } from './AuthButton';
 import { GameMode, Player } from '../types/game';
 import { User, Briefcase, ChevronRight } from 'lucide-react';
+import startScreenBg from '../assets/start-screen-bg.png';
 
 interface StartScreenProps {
   onStart: (name: string, mode: GameMode, teamName?: string, playerDetails?: Partial<Player>) => void;
@@ -37,10 +38,17 @@ export function StartScreen({ onStart }: StartScreenProps) {
   const availableTeams = getAvailableTeams();
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
-      <div className="max-w-3xl w-full bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-800">
+    <div className="relative min-h-screen overflow-hidden bg-slate-950">
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${startScreenBg})` }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950/88 via-slate-950/76 to-emerald-950/72" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_34%),radial-gradient(circle_at_bottom,rgba(16,185,129,0.24),transparent_30%)]" />
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-4">
+      <div className="max-w-3xl w-full bg-slate-900/78 rounded-3xl shadow-[0_30px_90px_rgba(2,6,23,0.78)] overflow-hidden border border-white/10 backdrop-blur-md">
         <div className="p-8 text-center border-b border-slate-800 flex flex-col items-center">
-          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500 tracking-tighter mb-2">ELIFOOT WEB</h1>
+          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500 tracking-tighter mb-2">FUTBOSS</h1>
           <p className="text-slate-400 mb-6">O clássico simulador de futebol, agora com mais opções.</p>
           <AuthButton />
         </div>
@@ -235,6 +243,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

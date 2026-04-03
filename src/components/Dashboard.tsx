@@ -227,7 +227,7 @@ export function Dashboard() {
           <div className="flex items-center justify-between border-b border-slate-700 p-6">
             <div>
               <h2 className="text-xl font-semibold text-slate-100">Notícias do Clube</h2>
-              <p className="mt-1 text-sm text-slate-400">Caixa de mensagens no ritmo do Elifoot.</p>
+                <p className="mt-1 text-sm text-slate-400">Caixa de mensagens no ritmo do FutBoss.</p>
             </div>
             <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300">
               {injuredPlayers.length} lesionado(s)

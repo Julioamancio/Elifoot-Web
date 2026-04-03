@@ -173,7 +173,7 @@ export function CalendarView() {
             <Newspaper className="h-5 w-5 text-sky-400" />
             <div>
               <h2 className="text-lg font-bold text-slate-100">Caixa de Notícias</h2>
-              <p className="text-sm text-slate-400">Estilo Elifoot: curta, direta e focada no que importa.</p>
+              <p className="text-sm text-slate-400">Estilo FutBoss: curta, direta e focada no que importa.</p>
             </div>
           </div>
           <div className="space-y-3 p-6">
