@@ -1,7 +1,8 @@
-import React from 'react';
-import { Trophy, Users, Activity, Calendar, DollarSign } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trophy, Users, Activity, Calendar, DollarSign, LogOut } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { PageHeader } from './ui/PageHeader';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 export function Dashboard() {
   const teams = useGameStore(state => state.teams);
@@ -12,6 +13,8 @@ export function Dashboard() {
   const gameMode = useGameStore(state => state.gameMode);
   const recentRoundSummary = useGameStore(state => state.recentRoundSummary);
   const newsFeed = useGameStore(state => state.newsFeed ?? []);
+  const resetGame = useGameStore(state => state.resetGame);
+  const [isRetireModalOpen, setIsRetireModalOpen] = useState(false);
 
   const userTeam = teams.find(team => team.id === userTeamId);
   const userNationalTeam =
@@ -241,6 +244,38 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+
+      {gameMode === 'manager' && (
+        <div className="rounded-2xl border border-rose-500/20 bg-slate-800 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-100">Encerrar carreira no clube</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Use esta opção quando quiser se aposentar do comando e voltar ao menu principal.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsRetireModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-5 py-3 text-sm font-bold text-rose-400 transition-colors hover:bg-rose-500/20"
+            >
+              <LogOut className="h-4 w-4" />
+              Aposentar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={isRetireModalOpen}
+        title="Aposentar do cargo?"
+        description="Você vai encerrar a carreira como técnico e voltar ao menu principal. Use esta opção só quando realmente quiser finalizar esse caminho."
+        confirmLabel="Confirmar aposentadoria"
+        onCancel={() => setIsRetireModalOpen(false)}
+        onConfirm={() => {
+          setIsRetireModalOpen(false);
+          resetGame();
+        }}
+      />
     </div>
   );
 }

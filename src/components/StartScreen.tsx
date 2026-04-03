@@ -25,13 +25,13 @@ export function StartScreen({ onStart }: StartScreenProps) {
   });
 
   const getAvailableTeams = () => {
-    const maxDivByCountry: Record<string, number> = {};
+    const topDivByCountry: Record<string, number> = {};
     teams.forEach(t => {
-      if (!maxDivByCountry[t.country] || t.division > maxDivByCountry[t.country]) {
-        maxDivByCountry[t.country] = t.division;
+      if (!topDivByCountry[t.country] || t.division < topDivByCountry[t.country]) {
+        topDivByCountry[t.country] = t.division;
       }
     });
-    return teams.filter(t => t.division === maxDivByCountry[t.country]);
+    return teams.filter(t => t.division === topDivByCountry[t.country]);
   };
 
   const availableTeams = getAvailableTeams();

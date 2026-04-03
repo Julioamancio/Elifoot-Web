@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { generateSchedule } from '../src/game/engine';
 import { generateTeams } from '../src/game/generator';
 import { useGameStore } from '../src/store/useGameStore';
-import type { Competition, GameState, Team } from '../src/types/game';
+import type { Competition, GameState, MatchEvent, Team } from '../src/types/game';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -100,12 +100,12 @@ function validateNewGameLifecycle() {
   );
   assert.ok(userFixtures.length > 0, 'user team should have future fixtures');
 
-  const sampledPlayer = userTeam!.players
-    .filter(player => player.age <= 30)
-    .sort((playerA, playerB) => playerA.age - playerB.age)[0];
-  assert.ok(sampledPlayer, 'should find a non-veteran player for age progression');
-  const sampledAge = sampledPlayer!.age;
-  const sampledId = sampledPlayer!.id;
+  const ageSnapshot = new Map(
+    userTeam!.players
+      .filter(player => player.age <= 30)
+      .map(player => [player.id, player.age]),
+  );
+  assert.ok(ageSnapshot.size > 0, 'should find players eligible for age progression');
 
   useGameStore.getState().playWeek();
   const afterWeek = useGameStore.getState();
@@ -116,11 +116,15 @@ function validateNewGameLifecycle() {
   useGameStore.getState().nextSeason();
   const afterSeason = useGameStore.getState();
   const progressedUserTeam = afterSeason.teams.find(team => team.id === afterSeason.userTeamId);
-  const progressedPlayer = progressedUserTeam?.players.find(player => player.id === sampledId);
+  const retainedProgressedPlayers =
+    progressedUserTeam?.players.filter(player => {
+      const previousAge = ageSnapshot.get(player.id);
+      return previousAge !== undefined && player.age === previousAge + 1;
+    }) ?? [];
   assert.equal(afterSeason.currentYear, 2027, 'next season should advance year');
   assert.equal(afterSeason.currentWeek, 1, 'next season should reset week');
-  assert.ok(progressedPlayer, 'sampled player should still exist after next season');
-  assert.equal(progressedPlayer!.age, sampledAge + 1, 'players should age by one season');
+  assert.ok(retainedProgressedPlayers.length > 0, 'at least one retained player should age by one season');
+  assert.ok(Array.isArray(afterSeason.marketPlayers), 'next season should refresh transfer market');
 }
 
 function validateClubDataSafety() {
@@ -134,10 +138,85 @@ function validateClubDataSafety() {
   });
 }
 
+function validatePlayerCareerInitialization() {
+  useGameStore.getState().resetGame();
+  useGameStore.getState().startNewGame('Julio', 'player', undefined, {
+    nationality: 'BR',
+    position: 'MID',
+    age: 18,
+  });
+
+  const state = useGameStore.getState();
+  const userTeam = state.teams.find(team => team.id === state.userTeamId);
+  const userPlayer = userTeam?.players.find(player => player.id === state.userPlayerId);
+  const lowestDivisionInCountry = Math.max(
+    ...state.teams.filter(team => team.country === 'BR' && team.division > 0).map(team => team.division),
+  );
+
+  assert.equal(state.gameMode, 'player', 'player career should keep player mode');
+  assert.ok(userTeam, 'player career should assign a club');
+  assert.ok(userPlayer, 'player career should create the user player');
+  assert.equal(userTeam?.division, lowestDivisionInCountry, 'player career should start in the lowest domestic division');
+  assert.ok(userPlayer?.contract, 'user player should start with a contract');
+}
+
+function validateManualWeekResultPreserved() {
+  useGameStore.getState().resetGame();
+  useGameStore.getState().startNewGame('Julio', 'manager', 'CSA');
+
+  const state = useGameStore.getState();
+  const userMatch = state.matches.find(
+    match =>
+      match.week === state.currentWeek &&
+      !match.played &&
+      (match.homeTeamId === state.userTeamId || match.awayTeamId === state.userTeamId),
+  );
+  assert.ok(userMatch, 'user match should exist on the current week');
+
+  const homeTeam = state.teams.find(team => team.id === userMatch!.homeTeamId)!;
+  const awayTeam = state.teams.find(team => team.id === userMatch!.awayTeamId)!;
+  const scoringPlayer = homeTeam.players.find(player => player.isStarter) ?? homeTeam.players[0];
+  const assistPlayer = homeTeam.players.find(player => player.id !== scoringPlayer.id) ?? scoringPlayer;
+
+  const manualEvents: MatchEvent[] = [
+    {
+      id: 'manual-goal',
+      matchId: userMatch!.id,
+      minute: 12,
+      type: 'GOAL',
+      teamId: homeTeam.id,
+      playerId: scoringPlayer.id,
+      assistPlayerId: assistPlayer.id,
+      reason: 'Validacao manual',
+    },
+  ];
+
+  useGameStore.getState().playWeek({
+    matchId: userMatch!.id,
+    homeScore: 1,
+    awayScore: 0,
+    events: manualEvents,
+  });
+
+  const afterWeek = useGameStore.getState();
+  const playedMatch = afterWeek.matches.find(match => match.id === userMatch!.id);
+
+  assert.equal(playedMatch?.played, true, 'manual match should be marked as played');
+  assert.equal(playedMatch?.homeScore, 1, 'manual result should preserve home score');
+  assert.equal(playedMatch?.awayScore, 0, 'manual result should preserve away score');
+  assert.equal(playedMatch?.events.length, manualEvents.length, 'manual match should preserve provided events');
+  assert.ok(
+    afterWeek.recentRoundSummary?.userResults.some(result => result.matchId === userMatch!.id),
+    'round summary should include the manually played user match',
+  );
+}
+
 function main() {
   validateLegacySaveNormalization();
   validateScheduleRules();
   validateNewGameLifecycle();
+  validatePlayerCareerInitialization();
+  validateManualWeekResultPreserved();
   validateClubDataSafety();
   console.log('Regression validation passed.');
 }

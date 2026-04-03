@@ -13,6 +13,7 @@ import {
 import { useGameStore } from '../store/useGameStore';
 import { getPlayerContractStatus, getPlayerRetirementRisk } from '../game/playerLifecycle';
 import { PageHeader } from './ui/PageHeader';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 export function PlayerDashboard() {
   const teams = useGameStore(state => state.teams);
@@ -23,6 +24,7 @@ export function PlayerDashboard() {
   const retireUserPlayer = useGameStore(state => state.retireUserPlayer);
   const currentYear = useGameStore(state => state.currentYear ?? 2026);
   const [trainResult, setTrainResult] = useState<{ success: boolean; improved: boolean; message: string } | null>(null);
+  const [isRetireModalOpen, setIsRetireModalOpen] = useState(false);
 
   const userClub = teams.find(team => team.division > 0 && team.players.some(player => player.id === userPlayerId));
   const userNationalTeam = teams.find(team => team.division === 0 && team.players.some(player => player.id === userPlayerId));
@@ -136,15 +138,19 @@ export function PlayerDashboard() {
           >
             Pedir transferência
           </button>
-          {player.age >= 35 && (
-            <button
-              onClick={() => retireUserPlayer()}
-              className="rounded-xl bg-rose-600 px-5 py-3 font-bold text-white transition-colors hover:bg-rose-500"
-            >
-              Aposentar agora
-            </button>
-          )}
+          <button
+            onClick={() => setIsRetireModalOpen(true)}
+            disabled={player.age < 35}
+            className="rounded-xl bg-rose-600 px-5 py-3 font-bold text-white transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Aposentar
+          </button>
         </div>
+        <p className="mt-4 text-sm text-slate-500">
+          {player.age >= 35
+            ? 'Ao se aposentar, sua carreira termina e o jogo volta para o menu principal.'
+            : 'A aposentadoria manual fica disponível a partir dos 35 anos.'}
+        </p>
 
         {trainResult && (
           <div
@@ -167,6 +173,18 @@ export function PlayerDashboard() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        open={isRetireModalOpen}
+        title="Aposentar jogador?"
+        description="Sua carreira de jogador será encerrada e o jogo vai voltar ao menu principal. Essa decisão não pode ser desfeita dentro da carreira atual."
+        confirmLabel="Confirmar aposentadoria"
+        onCancel={() => setIsRetireModalOpen(false)}
+        onConfirm={() => {
+          setIsRetireModalOpen(false);
+          retireUserPlayer();
+        }}
+      />
     </div>
   );
 }

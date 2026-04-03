@@ -46,9 +46,12 @@ export function MatchDay() {
   const currentMatches = matches.filter(m => m.week === currentWeek);
   const previousMatches = matches.filter(m => m.week === currentWeek - 1);
   const userEntityIds = new Set([userTeamId, userNationalTeam?.id].filter((value): value is string => Boolean(value)));
+  const hasResolvedTeams = (match: Match) =>
+    teams.some(team => team.id === match.homeTeamId) && teams.some(team => team.id === match.awayTeamId);
   const currentUserMatches = currentMatches.filter(
     match => userEntityIds.has(match.homeTeamId) || userEntityIds.has(match.awayTeamId),
   );
+  const playableCurrentUserMatches = currentUserMatches.filter(hasResolvedTeams);
 
   const prepareTeamForSimulation = (team: any) => {
     const players = team.players.map((player: any) => ({ ...player }));
@@ -98,8 +101,14 @@ export function MatchDay() {
   };
 
   const buildSimulationForMatch = (match: Match) => {
-    const home = prepareTeamForSimulation(teams.find(t => t.id === match.homeTeamId)!);
-    const away = prepareTeamForSimulation(teams.find(t => t.id === match.awayTeamId)!);
+    const homeSource = teams.find(t => t.id === match.homeTeamId);
+    const awaySource = teams.find(t => t.id === match.awayTeamId);
+    if (!homeSource || !awaySource) {
+      return null;
+    }
+
+    const home = prepareTeamForSimulation(homeSource);
+    const away = prepareTeamForSimulation(awaySource);
     const simulationResult = simulateMatch(home, away, {
       competition: match.competition,
       isKnockout: Boolean(match.isKnockout),
@@ -129,8 +138,21 @@ export function MatchDay() {
       }
     }
 
-    if (currentUserMatches.length > 0) {
-      const simulations = currentUserMatches.map(buildSimulationForMatch);
+    if (playableCurrentUserMatches.length > 0) {
+      const simulations = playableCurrentUserMatches
+        .map(buildSimulationForMatch)
+        .filter((simulation): simulation is NonNullable<ReturnType<typeof buildSimulationForMatch>> => Boolean(simulation));
+      if (simulations.length === 0) {
+        setIsSimulating(true);
+        setShowResults(false);
+
+        setTimeout(() => {
+          playWeek();
+          setIsSimulating(false);
+          setShowResults(true);
+        }, 1500);
+        return;
+      }
       setCompletedUserResults([]);
       setPendingUserSimulations(simulations.slice(1));
       setActiveSimulation(simulations[0]);
@@ -287,7 +309,7 @@ export function MatchDay() {
         awayTeam={activeSimulation.awayTeam}
         result={activeSimulation.result}
         completeLabel={pendingUserSimulations.length > 0 ? 'Próximo Jogo' : 'Concluir Rodada'}
-        sequenceLabel={`Jogo ${completedUserResults.length + 1} de ${currentUserMatches.length} da sua semana`}
+        sequenceLabel={`Jogo ${completedUserResults.length + 1} de ${playableCurrentUserMatches.length} da sua semana`}
         onComplete={handleSimulationComplete}
       />
     );
@@ -295,7 +317,7 @@ export function MatchDay() {
 
   const roundMatches = showResults ? previousMatches : currentMatches;
   const displayMatches = roundMatches.filter(
-    match => userEntityIds.has(match.homeTeamId) || userEntityIds.has(match.awayTeamId),
+    match => (userEntityIds.has(match.homeTeamId) || userEntityIds.has(match.awayTeamId)) && hasResolvedTeams(match),
   );
   const displayWeek = showResults ? currentWeek - 1 : currentWeek;
   const hiddenMatchesCount = roundMatches.length - displayMatches.length;

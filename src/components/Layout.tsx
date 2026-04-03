@@ -5,7 +5,6 @@ import {
   Calendar,
   DollarSign,
   LayoutDashboard,
-  LogOut,
   Medal,
   Trophy,
   User,
@@ -98,13 +97,6 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
 
         <div className="space-y-4 border-t border-slate-800 p-4">
           <AuthButton />
-          <button
-            onClick={() => useGameStore.getState().resetGame()}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/20 px-4 py-3 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/10"
-          >
-            <LogOut className="h-4 w-4" />
-            Aposentar / Sair
-          </button>
         </div>
       </aside>
 
