@@ -1,6 +1,16 @@
 import React from 'react';
 import { useGameStore } from '../store/useGameStore';
-import { Trophy, Users, Calendar, LayoutDashboard, DollarSign, Building2, Medal, User, LogOut } from 'lucide-react';
+import {
+  Building2,
+  Calendar,
+  DollarSign,
+  LayoutDashboard,
+  LogOut,
+  Medal,
+  Trophy,
+  User,
+  Users,
+} from 'lucide-react';
 import { cn } from '../lib/utils';
 import { AuthButton } from './AuthButton';
 
@@ -11,26 +21,33 @@ interface LayoutProps {
 }
 
 export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
-  const { teams, userTeamId, userPlayerId, gameMode, currentWeek } = useGameStore();
-  const userTeam = teams.find(t => t.id === userTeamId);
-  const userPlayer = userTeam?.players.find(p => p.id === userPlayerId);
+  const teams = useGameStore(state => state.teams);
+  const userTeamId = useGameStore(state => state.userTeamId);
+  const userPlayerId = useGameStore(state => state.userPlayerId);
+  const gameMode = useGameStore(state => state.gameMode);
+  const currentWeek = useGameStore(state => state.currentWeek);
+
+  const userTeam = teams.find(team => team.id === userTeamId);
+  const userPlayer = userTeam?.players.find(player => player.id === userPlayerId);
 
   if (!userTeam) return <>{children}</>;
 
   const managerTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'calendar', label: 'Agenda', icon: Calendar },
     { id: 'squad', label: 'Plantel', icon: Users },
     { id: 'market', label: 'Mercado', icon: DollarSign },
     { id: 'club', label: 'Clube/Estádio', icon: Building2 },
-    { id: 'standings', label: 'Classificação', icon: Trophy },
+    { id: 'standings', label: 'Competições', icon: Trophy },
     { id: 'match', label: 'Próximo Jogo', icon: Calendar },
     { id: 'ranking', label: 'Ranking', icon: Medal },
   ];
 
   const playerTabs = [
     { id: 'dashboard', label: 'Meu Jogador', icon: User },
+    { id: 'calendar', label: 'Agenda', icon: Calendar },
     { id: 'squad', label: 'Elenco', icon: Users },
-    { id: 'standings', label: 'Classificação', icon: Trophy },
+    { id: 'standings', label: 'Competições', icon: Trophy },
     { id: 'match', label: 'Próximo Jogo', icon: Calendar },
     { id: 'ranking', label: 'Ranking', icon: Medal },
   ];
@@ -38,11 +55,12 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
   const tabs = gameMode === 'player' ? playerTabs : managerTabs;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col md:flex-row">
-      {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-slate-950 border-r border-slate-800 flex flex-col">
-        <div className="p-6 border-b border-slate-800">
-          <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500 tracking-tight">ELIFOOT WEB</h1>
+    <div className="flex min-h-screen flex-col bg-slate-900 font-sans text-slate-100 md:flex-row">
+      <aside className="flex w-full flex-col border-r border-slate-800 bg-slate-950 md:w-64">
+        <div className="border-b border-slate-800 p-6">
+          <h1 className="bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-2xl font-black tracking-tight text-transparent">
+            ELIFOOT WEB
+          </h1>
           <div className="mt-4">
             {gameMode === 'player' && userPlayer ? (
               <>
@@ -52,11 +70,11 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
             ) : (
               <h2 className="text-lg font-bold text-slate-200">{userTeam.name}</h2>
             )}
-            <p className="text-sm text-slate-400 mt-1">Semana {currentWeek}</p>
+            <p className="mt-1 text-sm text-slate-400">Semana {currentWeek}</p>
           </div>
         </div>
-        
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+
+        <nav className="custom-scrollbar flex-1 space-y-2 overflow-y-auto p-4">
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (
@@ -64,36 +82,34 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
-                  activeTab === tab.id 
-                    ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-900/20" 
-                    : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                  'w-full rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200',
+                  'flex items-center gap-3',
+                  activeTab === tab.id
+                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-900/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
                 )}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className="h-5 w-5" />
                 {tab.label}
               </button>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-800 space-y-4">
+        <div className="space-y-4 border-t border-slate-800 p-4">
           <AuthButton />
-          <button 
+          <button
             onClick={() => useGameStore.getState().resetGame()}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-red-400 hover:bg-red-500/10 rounded-xl transition-colors border border-red-500/20"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/20 px-4 py-3 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/10"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="h-4 w-4" />
             Aposentar / Sair
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto bg-slate-900">
-        <div className="max-w-6xl mx-auto">
-          {children}
-        </div>
+      <main className="flex-1 overflow-y-auto bg-slate-900 p-6 md:p-8">
+        <div className="mx-auto max-w-6xl">{children}</div>
       </main>
     </div>
   );

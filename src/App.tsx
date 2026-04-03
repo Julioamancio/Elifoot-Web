@@ -10,6 +10,7 @@ import { Market } from './components/Market';
 import { Club } from './components/Club';
 import { Ranking } from './components/Ranking';
 import { PlayerDashboard } from './components/PlayerDashboard';
+import { CalendarView } from './components/CalendarView';
 
 export default function App() {
   const { userTeamId, gameMode, startNewGame } = useGameStore();
@@ -29,6 +30,8 @@ export default function App() {
         return <Dashboard />;
       case 'squad':
         return <Squad />;
+      case 'calendar':
+        return <CalendarView />;
       case 'market':
         return <Market />;
       case 'club':

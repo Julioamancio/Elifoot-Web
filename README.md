@@ -1,20 +1,32 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Elifoot Web
 
-# Run and deploy your AI Studio app
+Versão web inspirada no Elifoot, com modo carreira de manager e jogador.
 
-This contains everything you need to run your app locally.
+## Stack atual
 
-View your app in AI Studio: https://ai.studio/apps/ec60ebf7-bd2a-44cd-bfb7-9aec74f816be
+- React 19 + Vite
+- Express
+- SQLite local com `better-sqlite3`
+- Autenticação manual com usuário e senha
 
-## Run Locally
+## Como rodar
 
-**Prerequisites:**  Node.js
+**Pré-requisito:** Node.js
 
-
-1. Install dependencies:
+1. Instale as dependências:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Copie `.env.example` para `.env.local` ou `.env`
+3. Inicie o projeto:
    `npm run dev`
+4. Acesse:
+   `http://localhost:3000`
+
+## Banco de dados
+
+O projeto cria automaticamente um banco SQLite em `data/elifoot.sqlite`.
+
+## Autenticação e saves
+
+- O login agora é local, com criação manual de usuário e senha
+- Os saves do jogo ficam associados ao usuário no banco SQLite
+- Não há mais dependência ativa de Firebase para autenticação ou persistência

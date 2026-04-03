@@ -4,24 +4,119 @@ import { Play, FastForward, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { MatchSimulation } from './MatchSimulation';
 import { simulateMatch } from '../game/engine';
-import { MatchEvent } from '../types/game';
+import { Match, MatchEvent } from '../types/game';
 
 export function MatchDay() {
-  const { teams, matches, currentWeek, playWeek, userTeamId, userPlayerId, isGameOver, gameMode } = useGameStore();
+  const teams = useGameStore(state => state.teams);
+  const matches = useGameStore(state => state.matches);
+  const currentWeek = useGameStore(state => state.currentWeek);
+  const playWeek = useGameStore(state => state.playWeek);
+  const userTeamId = useGameStore(state => state.userTeamId);
+  const userPlayerId = useGameStore(state => state.userPlayerId);
+  const isGameOver = useGameStore(state => state.isGameOver);
+  const gameMode = useGameStore(state => state.gameMode);
   const [isSimulating, setIsSimulating] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const [activeSimulation, setActiveSimulation] = useState<{
-    match: any,
+  const [pendingUserSimulations, setPendingUserSimulations] = useState<Array<{
+    match: Match,
     homeTeam: any,
     awayTeam: any,
-    events: MatchEvent[]
+    result: { matchId: string, homeScore: number, awayScore: number, events: MatchEvent[] }
+  }>>([]);
+  const [completedUserResults, setCompletedUserResults] = useState<
+    Array<{ matchId: string, homeScore: number, awayScore: number, events: MatchEvent[] }>
+  >([]);
+  const [activeSimulation, setActiveSimulation] = useState<{
+    match: Match,
+    homeTeam: any,
+    awayTeam: any,
+    result: { matchId: string, homeScore: number, awayScore: number, events: MatchEvent[] }
   } | null>(null);
 
   const userTeam = teams.find(t => t.id === userTeamId);
-  const userNationalTeam = gameMode === 'player' ? teams.find(t => t.division === 0 && t.players.some(p => p.id === userPlayerId)) : null;
+  const userNationalTeam = gameMode === 'player'
+    ? teams.find(
+        t =>
+          t.division === 0 &&
+          (t.players.some(p => p.id === userPlayerId) ||
+            Object.values(t.competitionSquads ?? {}).some(players => players?.some(player => player.id === userPlayerId))),
+      )
+    : null;
   
   const currentMatches = matches.filter(m => m.week === currentWeek);
   const previousMatches = matches.filter(m => m.week === currentWeek - 1);
+  const userEntityIds = new Set([userTeamId, userNationalTeam?.id].filter((value): value is string => Boolean(value)));
+  const currentUserMatches = currentMatches.filter(
+    match => userEntityIds.has(match.homeTeamId) || userEntityIds.has(match.awayTeamId),
+  );
+
+  const prepareTeamForSimulation = (team: any) => {
+    const players = team.players.map((player: any) => ({ ...player }));
+    const availablePlayers = players.filter((player: any) => !(player.injury?.weeksRemaining > 0));
+    const selectedIds = new Set<string>();
+
+    players.forEach((player: any) => {
+      if (player.injury?.weeksRemaining > 0) {
+        player.isStarter = false;
+      }
+    });
+
+    const preferredStarters = availablePlayers.filter((player: any) => player.isStarter);
+    const pick = (position: string, limit: number) => {
+      preferredStarters
+        .filter((player: any) => player.position === position && !selectedIds.has(player.id))
+        .sort((playerA: any, playerB: any) => playerB.overall - playerA.overall)
+        .slice(0, limit)
+        .forEach((player: any) => selectedIds.add(player.id));
+
+      availablePlayers
+        .filter((player: any) => player.position === position && !selectedIds.has(player.id))
+        .sort((playerA: any, playerB: any) => playerB.overall - playerA.overall)
+        .slice(0, Math.max(0, limit - [...selectedIds].filter(id => availablePlayers.find((player: any) => player.id === id)?.position === position).length))
+        .forEach((player: any) => selectedIds.add(player.id));
+    };
+
+    pick('GK', 1);
+    pick('DEF', 4);
+    pick('MID', 4);
+    pick('ATK', 2);
+
+    availablePlayers
+      .filter((player: any) => !selectedIds.has(player.id))
+      .sort((playerA: any, playerB: any) => playerB.overall - playerA.overall)
+      .forEach((player: any) => {
+        if (selectedIds.size < 11) {
+          selectedIds.add(player.id);
+        }
+      });
+
+    players.forEach((player: any) => {
+      player.isStarter = selectedIds.has(player.id);
+    });
+
+    return { ...team, players };
+  };
+
+  const buildSimulationForMatch = (match: Match) => {
+    const home = prepareTeamForSimulation(teams.find(t => t.id === match.homeTeamId)!);
+    const away = prepareTeamForSimulation(teams.find(t => t.id === match.awayTeamId)!);
+    const simulationResult = simulateMatch(home, away, {
+      competition: match.competition,
+      isKnockout: Boolean(match.isKnockout),
+    });
+
+    return {
+      match,
+      homeTeam: home,
+      awayTeam: away,
+      result: {
+        matchId: match.id,
+        homeScore: simulationResult.homeScore,
+        awayScore: simulationResult.awayScore,
+        events: simulationResult.events,
+      },
+    };
+  };
 
   const handlePlayWeek = () => {
     if (!userTeam) return;
@@ -34,23 +129,11 @@ export function MatchDay() {
       }
     }
 
-    const userMatch = currentMatches.find(m => 
-      m.homeTeamId === userTeamId || 
-      m.awayTeamId === userTeamId || 
-      (userNationalTeam && (m.homeTeamId === userNationalTeam.id || m.awayTeamId === userNationalTeam.id))
-    );
-    
-    if (userMatch) {
-      const home = teams.find(t => t.id === userMatch.homeTeamId)!;
-      const away = teams.find(t => t.id === userMatch.awayTeamId)!;
-      const result = simulateMatch(home, away);
-      
-      setActiveSimulation({
-        match: userMatch,
-        homeTeam: home,
-        awayTeam: away,
-        events: result.events
-      });
+    if (currentUserMatches.length > 0) {
+      const simulations = currentUserMatches.map(buildSimulationForMatch);
+      setCompletedUserResults([]);
+      setPendingUserSimulations(simulations.slice(1));
+      setActiveSimulation(simulations[0]);
     } else {
       setIsSimulating(true);
       setShowResults(false);
@@ -64,19 +147,32 @@ export function MatchDay() {
   };
 
   const handleSimulationComplete = (result: { matchId: string, homeScore: number, awayScore: number, events: MatchEvent[] }) => {
-    setActiveSimulation(null);
+    const updatedResults = [...completedUserResults, result];
+    const [nextSimulation, ...remainingSimulations] = pendingUserSimulations;
+
+    setCompletedUserResults(updatedResults);
+
+    if (nextSimulation) {
+      setPendingUserSimulations(remainingSimulations);
+      setActiveSimulation(nextSimulation);
+      return;
+    }
+
+    setPendingUserSimulations([]);
     setIsSimulating(true);
     setShowResults(false);
     
     setTimeout(() => {
-      playWeek(result);
+      playWeek(updatedResults);
+      setActiveSimulation(null);
+      setCompletedUserResults([]);
       setIsSimulating(false);
-      setShowResults(true);
+      setShowResults(false);
     }, 500);
   };
 
   if (isGameOver) {
-    const { jobOffers, acceptJobOffer, acceptPlayerOffer, gameMode, managerReputation, userPlayerId } = useGameStore.getState();
+    const { jobOffers, acceptJobOffer, acceptPlayerOffer, gameMode, managerReputation, userPlayerId, seasonReview } = useGameStore.getState();
     const offers = jobOffers.map(id => teams.find(t => t.id === id)).filter(Boolean);
     const userPlayer = userTeam?.players.find(p => p.id === userPlayerId);
 
@@ -185,17 +281,24 @@ export function MatchDay() {
   if (activeSimulation) {
     return (
       <MatchSimulation 
+        key={activeSimulation.match.id}
         match={activeSimulation.match}
         homeTeam={activeSimulation.homeTeam}
         awayTeam={activeSimulation.awayTeam}
-        events={activeSimulation.events}
+        result={activeSimulation.result}
+        completeLabel={pendingUserSimulations.length > 0 ? 'Próximo Jogo' : 'Concluir Rodada'}
+        sequenceLabel={`Jogo ${completedUserResults.length + 1} de ${currentUserMatches.length} da sua semana`}
         onComplete={handleSimulationComplete}
       />
     );
   }
 
-  const displayMatches = showResults ? previousMatches : currentMatches;
+  const roundMatches = showResults ? previousMatches : currentMatches;
+  const displayMatches = roundMatches.filter(
+    match => userEntityIds.has(match.homeTeamId) || userEntityIds.has(match.awayTeamId),
+  );
   const displayWeek = showResults ? currentWeek - 1 : currentWeek;
+  const hiddenMatchesCount = roundMatches.length - displayMatches.length;
 
   // Group matches by competition
   const matchesByComp = displayMatches.reduce((acc, match) => {
@@ -209,6 +312,11 @@ export function MatchDay() {
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-100">Rodada {displayWeek}</h1>
+          {hiddenMatchesCount > 0 && (
+            <p className="mt-2 text-xs text-slate-500">
+              {hiddenMatchesCount} jogo(s) sem participação do seu time ficam em segundo plano e são simulados automaticamente.
+            </p>
+          )}
           <p className="text-slate-400 mt-1">
             {showResults ? 'Resultados da rodada.' : 'Próximos confrontos.'}
           </p>
@@ -243,6 +351,19 @@ export function MatchDay() {
         )}
       </header>
 
+      {displayMatches.length === 0 && (
+        <div className="rounded-2xl border border-slate-700 bg-slate-800/80 px-6 py-10 text-center">
+          <h2 className="text-xl font-bold text-slate-100">
+            {showResults ? 'Nenhum resultado do seu time nesta semana.' : 'Nenhum jogo seu nesta semana.'}
+          </h2>
+          <p className="mt-2 text-slate-400">
+            {showResults
+              ? 'As outras competições já foram atualizadas em segundo plano.'
+              : 'Ao avançar a rodada, as outras competições serão simuladas automaticamente sem abrir a visualização delas.'}
+          </p>
+        </div>
+      )}
+
       {Object.entries(matchesByComp).map(([comp, compMatches]) => (
         <div key={comp} className="space-y-4">
           <h2 className="text-xl font-bold text-slate-300 border-b border-slate-700 pb-2">
@@ -251,6 +372,7 @@ export function MatchDay() {
              comp === 'NATIONAL_CUP' ? 'Copa Nacional' :
              comp === 'CONTINENTAL' ? 'Copa Continental' :
              comp === 'WORLD_CUP' ? 'Copa do Mundo' :
+             comp === 'OLYMPICS' ? 'Olimpíadas' :
              'Copa Continental Secundária'}
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -264,6 +386,15 @@ export function MatchDay() {
 
               if (!home || !away) return null;
 
+              const shouldFlipTeams = Boolean(isAwayUser);
+              const leftTeam = shouldFlipTeams ? away : home;
+              const rightTeam = shouldFlipTeams ? home : away;
+              const leftIsUser = shouldFlipTeams ? isAwayUser : isHomeUser;
+              const rightIsUser = shouldFlipTeams ? isHomeUser : isAwayUser;
+              const displayScore = shouldFlipTeams
+                ? `${match.awayScore} - ${match.homeScore}`
+                : `${match.homeScore} - ${match.awayScore}`;
+
               return (
                 <div 
                   key={match.id} 
@@ -275,15 +406,15 @@ export function MatchDay() {
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 text-right">
-                      <p className={cn("font-bold text-lg", isHomeUser ? "text-emerald-400" : "text-slate-200")}>
-                        {home.name}
+                      <p className={cn("font-bold text-lg", leftIsUser ? "text-emerald-400" : "text-slate-200")}>
+                        {leftTeam.name}
                       </p>
                     </div>
                     
                     <div className="flex-shrink-0 px-4 py-2 bg-slate-900 rounded-lg border border-slate-700 min-w-[80px] text-center">
                       {match.played || showResults ? (
                         <span className="font-mono font-black text-xl text-white">
-                          {match.homeScore} - {match.awayScore}
+                          {displayScore}
                         </span>
                       ) : (
                         <span className="font-mono font-bold text-slate-500">VS</span>
@@ -291,8 +422,8 @@ export function MatchDay() {
                     </div>
                     
                     <div className="flex-1 text-left">
-                      <p className={cn("font-bold text-lg", isAwayUser ? "text-emerald-400" : "text-slate-200")}>
-                        {away.name}
+                      <p className={cn("font-bold text-lg", rightIsUser ? "text-emerald-400" : "text-slate-200")}>
+                        {rightTeam.name}
                       </p>
                     </div>
                   </div>
@@ -301,8 +432,9 @@ export function MatchDay() {
                     <div className="mt-4 pt-4 border-t border-slate-700/50 text-sm">
                       {match.events.map((event, idx) => {
                         const team = teams.find(t => t.id === event.teamId);
-                        const player = team?.players.find(p => p.id === event.playerId);
-                        const isHome = event.teamId === home.id;
+                        const squad = team?.competitionSquads?.[match.competition] ?? team?.players ?? [];
+                        const player = squad.find(p => p.id === event.playerId);
+                        const isLeft = event.teamId === leftTeam.id;
                         
                         const getEventIcon = () => {
                           if (event.type === 'GOAL') return <span className="text-emerald-400">⚽</span>;
@@ -314,12 +446,13 @@ export function MatchDay() {
                         };
 
                         return (
-                          <div key={idx} className={cn("flex items-center gap-2 mb-1", isHome ? "justify-start" : "justify-end")}>
-                            {isHome && <span className="text-emerald-400 font-mono text-xs">{event.minute}'</span>}
-                            {isHome && getEventIcon()}
+                          <div key={idx} className={cn("flex items-center gap-2 mb-1", isLeft ? "justify-start" : "justify-end")}>
+                            {isLeft && <span className="text-emerald-400 font-mono text-xs">{event.minute}'</span>}
+                            {isLeft && getEventIcon()}
                             <span className="text-slate-300">{player?.name}</span>
-                            {!isHome && getEventIcon()}
-                            {!isHome && <span className="text-emerald-400 font-mono text-xs">{event.minute}'</span>}
+                            {event.reason && <span className="text-slate-500 text-xs">({event.reason})</span>}
+                            {!isLeft && getEventIcon()}
+                            {!isLeft && <span className="text-emerald-400 font-mono text-xs">{event.minute}'</span>}
                           </div>
                         );
                       })}

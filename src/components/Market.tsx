@@ -1,116 +1,197 @@
 import React from 'react';
 import { useGameStore } from '../store/useGameStore';
-import { DollarSign, TrendingUp, UserPlus, UserMinus } from 'lucide-react';
+import { DollarSign, TrendingUp, UserMinus, UserPlus } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { PageHeader } from './ui/PageHeader';
+
+const getAskingPrice = (
+  value: number,
+  age: number,
+  form = 6,
+  yearsLeft = 1,
+  requestedTransfer = false,
+) => {
+  const ageModifier = age <= 23 ? 0.12 : age >= 31 ? -0.12 : 0;
+  const formModifier = form >= 7.2 ? 0.1 : form <= 5.8 ? -0.08 : 0;
+  const contractModifier = yearsLeft >= 3 ? 0.08 : yearsLeft === 0 ? -0.12 : 0;
+  const transferModifier = requestedTransfer ? -0.08 : 0;
+  return Math.round(value * Math.max(0.82, Math.min(1.35, 1.02 + ageModifier + formModifier + contractModifier + transferModifier)));
+};
 
 export function Market() {
-  const { teams, userTeamId, marketPlayers, buyPlayer, sellPlayer } = useGameStore();
-  const userTeam = teams.find(t => t.id === userTeamId);
+  const teams = useGameStore(state => state.teams);
+  const userTeamId = useGameStore(state => state.userTeamId);
+  const marketPlayers = useGameStore(state => state.marketPlayers);
+  const buyPlayer = useGameStore(state => state.buyPlayer);
+  const sellPlayer = useGameStore(state => state.sellPlayer);
+  const currentYear = useGameStore(state => state.currentYear ?? 2026);
+  const userTeam = teams.find(team => team.id === userTeamId);
 
   if (!userTeam) return null;
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
-  };
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
 
   return (
     <div className="space-y-6">
-      <header className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-100">Mercado de Transferências</h1>
-          <p className="text-slate-400 mt-1">Compre e venda jogadores para fortalecer seu elenco.</p>
-        </div>
-        <div className="bg-slate-800 px-6 py-3 rounded-xl border border-slate-700 flex items-center gap-3">
-          <DollarSign className="w-6 h-6 text-emerald-500" />
-          <div>
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Saldo em Caixa</p>
-            <p className="text-xl font-bold text-emerald-400">{formatCurrency(userTeam.finances)}</p>
+      <PageHeader
+        title="Mercado de Transferências"
+        subtitle="Negocie com mais contexto: valor pedido, contrato e situação do jogador."
+        icon={<TrendingUp className="h-7 w-7" />}
+        aside={
+          <div className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 px-6 py-3">
+            <DollarSign className="h-6 w-6 text-emerald-500" />
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Saldo em Caixa</p>
+              <p className="text-xl font-bold text-emerald-400">{formatCurrency(userTeam.finances)}</p>
+            </div>
           </div>
-        </div>
-      </header>
+        }
+      />
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Market Players (Buy) */}
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-slate-200 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-blue-400" /> Jogadores Disponíveis
+          <h2 className="flex items-center gap-2 text-xl font-bold text-slate-200">
+            <TrendingUp className="h-5 w-5 text-blue-400" /> Jogadores Disponíveis
           </h2>
           {marketPlayers.length === 0 ? (
-            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 text-center">
+            <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-8 text-center">
               <p className="text-slate-400">O mercado está fechado no momento. Volte na próxima janela.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {marketPlayers.map(player => (
-                <div key={player.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-bold text-slate-200">{player.name}</p>
-                    <div className="flex items-center gap-3 mt-1 text-sm">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded font-bold text-[10px]",
-                        player.position === 'GK' ? "bg-yellow-500/20 text-yellow-500" :
-                        player.position === 'DEF' ? "bg-blue-500/20 text-blue-400" :
-                        player.position === 'MID' ? "bg-emerald-500/20 text-emerald-400" :
-                        "bg-red-500/20 text-red-400"
-                      )}>
-                        {player.position}
-                      </span>
-                      <span className="text-slate-400">Idade: {player.age}</span>
-                      <span className="text-slate-400">Força: <span className="font-bold text-emerald-400">{player.overall}</span></span>
+              {marketPlayers.map(player => {
+                const askingPrice = getAskingPrice(
+                  player.value,
+                  player.age,
+                  player.form,
+                  Math.max(0, (player.contract?.endYear ?? currentYear) - currentYear),
+                  player.contract?.requestedTransfer ?? false,
+                );
+
+                return (
+                  <div
+                    key={player.id}
+                    className="flex items-center justify-between gap-4 rounded-xl border border-slate-700 bg-slate-800 p-4"
+                  >
+                    <div>
+                      <p className="font-bold text-slate-200">{player.name}</p>
+                      <div className="mt-1 flex items-center gap-3 text-sm">
+                        <span
+                          className={cn(
+                            'rounded px-2 py-0.5 text-[10px] font-bold',
+                            player.position === 'GK'
+                              ? 'bg-yellow-500/20 text-yellow-500'
+                              : player.position === 'DEF'
+                                ? 'bg-blue-500/20 text-blue-400'
+                                : player.position === 'MID'
+                                  ? 'bg-emerald-500/20 text-emerald-400'
+                                  : 'bg-red-500/20 text-red-400',
+                          )}
+                        >
+                          {player.position}
+                        </span>
+                        <span className="text-slate-400">Idade: {player.age}</span>
+                        <span className="text-slate-400">
+                          Forca: <span className="font-bold text-emerald-400">{player.overall}</span>
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                        <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-slate-400">
+                          Contrato ate {player.contract?.endYear ?? currentYear}
+                        </span>
+                        <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-slate-400">
+                          Salario {formatCurrency(player.salary)}/mes
+                        </span>
+                        {player.contract?.requestedTransfer && (
+                          <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-bold text-rose-400">
+                            Disponivel para negociar
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="font-bold text-slate-300">{formatCurrency(askingPrice)}</span>
+                      <button
+                        onClick={() => buyPlayer(player.id)}
+                        disabled={userTeam.finances < askingPrice}
+                        className={cn(
+                          'flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors',
+                          userTeam.finances >= askingPrice
+                            ? 'border-emerald-500/30 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30'
+                            : 'cursor-not-allowed border-slate-600 bg-slate-700 text-slate-500',
+                        )}
+                      >
+                        <UserPlus className="h-4 w-4" /> Comprar
+                      </button>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span className="font-bold text-slate-300">{formatCurrency(player.value)}</span>
-                    <button
-                      onClick={() => buyPlayer(player.id)}
-                      disabled={userTeam.finances < player.value}
-                      className={cn(
-                        "flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors",
-                        userTeam.finances >= player.value
-                          ? "bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30"
-                          : "bg-slate-700 text-slate-500 cursor-not-allowed border border-slate-600"
-                      )}
-                    >
-                      <UserPlus className="w-4 h-4" /> Comprar
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Your Players (Sell) */}
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-slate-200 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-emerald-400" /> Seu Elenco
+          <h2 className="flex items-center gap-2 text-xl font-bold text-slate-200">
+            <DollarSign className="h-5 w-5 text-emerald-400" /> Seu Elenco
           </h2>
-          <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+          <div className="custom-scrollbar max-h-[600px] space-y-3 overflow-y-auto pr-2">
             {userTeam.players.map(player => (
-              <div key={player.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between gap-4">
+              <div
+                key={player.id}
+                className="flex items-center justify-between gap-4 rounded-xl border border-slate-700 bg-slate-800 p-4"
+              >
                 <div>
                   <p className="font-bold text-slate-200">{player.name}</p>
-                  <div className="flex items-center gap-3 mt-1 text-sm">
-                    <span className={cn(
-                      "px-2 py-0.5 rounded font-bold text-[10px]",
-                      player.position === 'GK' ? "bg-yellow-500/20 text-yellow-500" :
-                      player.position === 'DEF' ? "bg-blue-500/20 text-blue-400" :
-                      player.position === 'MID' ? "bg-emerald-500/20 text-emerald-400" :
-                      "bg-red-500/20 text-red-400"
-                    )}>
+                  <div className="mt-1 flex items-center gap-3 text-sm">
+                    <span
+                      className={cn(
+                        'rounded px-2 py-0.5 text-[10px] font-bold',
+                        player.position === 'GK'
+                          ? 'bg-yellow-500/20 text-yellow-500'
+                          : player.position === 'DEF'
+                            ? 'bg-blue-500/20 text-blue-400'
+                            : player.position === 'MID'
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : 'bg-red-500/20 text-red-400',
+                      )}
+                    >
                       {player.position}
                     </span>
                     <span className="text-slate-400">Idade: {player.age}</span>
-                    <span className="text-slate-400">Força: <span className="font-bold text-emerald-400">{player.overall}</span></span>
+                    <span className="text-slate-400">
+                      Forca: <span className="font-bold text-emerald-400">{player.overall}</span>
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                    <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-slate-400">
+                      Contrato ate {player.contract?.endYear ?? currentYear}
+                    </span>
+                    {player.contract?.requestedSalaryIncrease && (
+                      <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-bold text-sky-400">
+                        Pede aumento
+                      </span>
+                    )}
+                    {player.contract?.requestedTransfer && (
+                      <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-bold text-rose-400">
+                        Quer sair
+                      </span>
+                    )}
+                    {player.injury && player.injury.weeksRemaining > 0 && (
+                      <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-bold text-amber-400">
+                        Lesionado
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <span className="font-bold text-slate-300">{formatCurrency(player.value)}</span>
                   <button
                     onClick={() => sellPlayer(player.id)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-colors"
+                    className="flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/20 px-3 py-1.5 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/30"
                   >
-                    <UserMinus className="w-4 h-4" /> Vender
+                    <UserMinus className="h-4 w-4" /> Vender
                   </button>
                 </div>
               </div>

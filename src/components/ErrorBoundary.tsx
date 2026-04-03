@@ -12,7 +12,7 @@ interface State {
 export class ErrorBoundary extends React.Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null
+    error: null,
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -26,14 +26,15 @@ export class ErrorBoundary extends React.Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       let errorMessage = 'Ocorreu um erro inesperado.';
+
       try {
         if (this.state.error?.message) {
           const parsed = JSON.parse(this.state.error.message);
-          if (parsed.error) {
-            errorMessage = `Erro de Permissão (Firestore): ${parsed.error}`;
+          if (parsed.error || parsed.message) {
+            errorMessage = parsed.error || parsed.message;
           }
         }
-      } catch (e) {
+      } catch {
         errorMessage = this.state.error?.message || errorMessage;
       }
 

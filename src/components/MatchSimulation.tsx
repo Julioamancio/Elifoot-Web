@@ -1,84 +1,199 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Match, Team, MatchEvent } from '../types/game';
-import { Play, FastForward, Pause, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowRightLeft,
+  CheckCircle2,
+  Flag,
+  Pause,
+  Play,
+  ShieldAlert,
+  Square,
+  Trophy,
+} from 'lucide-react';
+import { Match, MatchEvent, Team } from '../types/game';
 import { cn } from '../lib/utils';
 
 interface MatchSimulationProps {
   match: Match;
   homeTeam: Team;
   awayTeam: Team;
-  events: MatchEvent[];
-  onComplete: (result: { matchId: string, homeScore: number, awayScore: number, events: MatchEvent[] }) => void;
+  result: { matchId: string; homeScore: number; awayScore: number; events: MatchEvent[] };
+  onComplete: (result: { matchId: string; homeScore: number; awayScore: number; events: MatchEvent[] }) => void;
+  completeLabel?: string;
+  sequenceLabel?: string;
 }
 
-interface PlayerDot {
+type EventViewModel = {
   id: string;
-  x: number;
-  y: number;
-  targetX: number;
-  targetY: number;
+  minute: number;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  teamName: string;
   isHome: boolean;
-  position: string;
-}
+  accentClass: string;
+};
 
-export function MatchSimulation({ match, homeTeam, awayTeam, events, onComplete }: MatchSimulationProps) {
+export function MatchSimulation({
+  match,
+  homeTeam,
+  awayTeam,
+  result,
+  onComplete,
+  completeLabel = 'Concluir Rodada',
+  sequenceLabel,
+}: MatchSimulationProps) {
   const [minute, setMinute] = useState(0);
-  const [speed, setSpeed] = useState<number>(1); // 1x, 2x, 10x
+  const [speed, setSpeed] = useState<number>(1);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [homeScore, setHomeScore] = useState(0);
-  const [awayScore, setAwayScore] = useState(0);
-  const [currentEvent, setCurrentEvent] = useState<MatchEvent | null>(null);
   const [isFinished, setIsFinished] = useState(false);
+  const [revealedEventIds, setRevealedEventIds] = useState<string[]>([]);
+  const [isSubmittingResult, setIsSubmittingResult] = useState(false);
 
-  const requestRef = useRef<number>(0);
-  const lastTimeRef = useRef<number>(0);
   const minuteRef = useRef(0);
-  const processedEventsRef = useRef<Set<string>>(new Set());
-  
-  const [players, setPlayers] = useState<PlayerDot[]>([]);
+  const isPlayingRef = useRef(true);
+  const isFinishedRef = useRef(false);
+  const revealedIdsRef = useRef<Set<string>>(new Set());
+  const timelineEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Initialize players
   useEffect(() => {
-    const initPlayers: PlayerDot[] = [];
-    
-    // Home team (left side)
-    const homeStarters = homeTeam.players.filter(p => p.isStarter);
-    homeStarters.forEach((p, i) => {
-      initPlayers.push({
-        id: p.id,
-        x: 25 + Math.random() * 20,
-        y: 10 + (i * 80 / 11) + Math.random() * 10,
-        targetX: 25 + Math.random() * 20,
-        targetY: 10 + (i * 80 / 11) + Math.random() * 10,
-        isHome: true,
-        position: p.position
-      });
-    });
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
-    // Away team (right side)
-    const awayStarters = awayTeam.players.filter(p => p.isStarter);
-    awayStarters.forEach((p, i) => {
-      initPlayers.push({
-        id: p.id,
-        x: 75 - Math.random() * 20,
-        y: 10 + (i * 80 / 11) + Math.random() * 10,
-        targetX: 75 - Math.random() * 20,
-        targetY: 10 + (i * 80 / 11) + Math.random() * 10,
-        isHome: false,
-        position: p.position
-      });
-    });
-
-    setPlayers(initPlayers);
-  }, [homeTeam, awayTeam]);
-
-  // Animation loop
   useEffect(() => {
-    let animationFrameId: number;
+    isFinishedRef.current = isFinished;
+  }, [isFinished]);
+
+  useEffect(() => {
+    minuteRef.current = 0;
+    isPlayingRef.current = true;
+    isFinishedRef.current = false;
+    revealedIdsRef.current = new Set();
+    setMinute(0);
+    setSpeed(1);
+    setIsPlaying(true);
+    setIsFinished(false);
+    setRevealedEventIds([]);
+    setIsSubmittingResult(false);
+  }, [match.id]);
+
+  const sortedEvents = [...result.events].sort((a, b) => a.minute - b.minute);
+
+  const getPlayerName = (team: Team, playerId: string) => {
+    return team.players.find(player => player.id === playerId)?.name || 'Jogador desconhecido';
+  };
+
+  const buildEventView = (event: MatchEvent): EventViewModel => {
+    const isHome = event.teamId === homeTeam.id;
+    const team = isHome ? homeTeam : awayTeam;
+    const playerName = getPlayerName(team, event.playerId);
+    const assistName = event.assistPlayerId ? getPlayerName(team, event.assistPlayerId) : null;
+
+    switch (event.type) {
+      case 'GOAL':
+        return {
+          id: event.id,
+          minute: event.minute,
+          icon: <Trophy className="h-4 w-4" />,
+          title: `Gol do ${team.name}`,
+          description: assistName
+            ? `${playerName} marcou com assistência de ${assistName}.`
+            : `${playerName} balançou as redes.`,
+          teamName: team.name,
+          isHome,
+          accentClass: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+        };
+      case 'YELLOW_CARD':
+        return {
+          id: event.id,
+          minute: event.minute,
+          icon: <Square className="h-4 w-4 fill-yellow-400 text-yellow-400" />,
+          title: `Cartão amarelo para ${playerName}`,
+          description: `${playerName} foi advertido pelo árbitro.`,
+          teamName: team.name,
+          isHome,
+          accentClass: 'border-yellow-500/40 bg-yellow-500/10 text-yellow-300',
+        };
+      case 'RED_CARD':
+        return {
+          id: event.id,
+          minute: event.minute,
+          icon: <ShieldAlert className="h-4 w-4" />,
+          title: `Cartão vermelho para ${playerName}`,
+          description: `${playerName} foi expulso e deixa o ${team.name} com um a menos.`,
+          teamName: team.name,
+          isHome,
+          accentClass: 'border-red-500/40 bg-red-500/10 text-red-300',
+        };
+      case 'SUBSTITUTION':
+        return {
+          id: event.id,
+          minute: event.minute,
+          icon: <ArrowRightLeft className="h-4 w-4" />,
+          title: `Substituição no ${team.name}`,
+          description: assistName
+            ? `${playerName} entrou no lugar de ${assistName}.`
+            : `${playerName} entrou em campo.`,
+          teamName: team.name,
+          isHome,
+          accentClass: 'border-sky-500/40 bg-sky-500/10 text-sky-300',
+        };
+      case 'OFFSIDE':
+        return {
+          id: event.id,
+          minute: event.minute,
+          icon: <Flag className="h-4 w-4" />,
+          title: `Impedimento do ${team.name}`,
+          description: `${playerName} foi flagrado em posição irregular.`,
+          teamName: team.name,
+          isHome,
+          accentClass: 'border-orange-500/40 bg-orange-500/10 text-orange-300',
+        };
+      case 'INJURY':
+        return {
+          id: event.id,
+          minute: event.minute,
+          icon: <ShieldAlert className="h-4 w-4" />,
+          title: `Lesao no ${team.name}`,
+          description: event.reason ? `${playerName} saiu sentindo ${event.reason}.` : `${playerName} deixou o campo com dores.`,
+          teamName: team.name,
+          isHome,
+          accentClass: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
+        };
+      default:
+        return {
+          id: event.id,
+          minute: event.minute,
+          icon: <Flag className="h-4 w-4" />,
+          title: `Lance do ${team.name}`,
+          description: `${playerName} participou da jogada.`,
+          teamName: team.name,
+          isHome,
+          accentClass: 'border-slate-500/40 bg-slate-500/10 text-slate-300',
+        };
+    }
+  };
+
+  const revealedEvents = useMemo(
+    () =>
+      sortedEvents
+        .filter(event => revealedEventIds.includes(event.id))
+        .map(buildEventView),
+    [revealedEventIds, sortedEvents],
+  );
+
+  const homeScore = revealedEvents.filter(event => event.title.startsWith('Gol') && event.isHome).length;
+  const awayScore = revealedEvents.filter(event => event.title.startsWith('Gol') && !event.isHome).length;
+
+  useEffect(() => {
+    timelineEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [revealedEvents.length]);
+
+  useEffect(() => {
+    let animationFrameId = 0;
     let lastTime = performance.now();
 
     const update = (time: number) => {
-      if (!isPlaying || isFinished) {
+      if (!isPlayingRef.current || isFinishedRef.current) {
         lastTime = time;
         animationFrameId = requestAnimationFrame(update);
         return;
@@ -87,10 +202,8 @@ export function MatchSimulation({ match, homeTeam, awayTeam, events, onComplete 
       const deltaTime = time - lastTime;
       lastTime = time;
 
-      // Update minute
-      const minuteIncrement = (deltaTime / 100) * speed;
-      minuteRef.current += minuteIncrement;
-      
+      minuteRef.current += (deltaTime / 100) * speed;
+
       if (minuteRef.current >= 90) {
         minuteRef.current = 90;
         setMinute(90);
@@ -100,63 +213,15 @@ export function MatchSimulation({ match, homeTeam, awayTeam, events, onComplete 
         setMinute(Math.floor(minuteRef.current));
       }
 
-      // Check events
-      const currentMin = Math.floor(minuteRef.current);
-      const evs = events.filter(e => e.minute === currentMin);
-      
-      const newEvent = evs.find(e => !processedEventsRef.current.has(e.id));
-      
-      if (newEvent) {
-        processedEventsRef.current.add(newEvent.id);
-        setCurrentEvent(newEvent);
-        if (newEvent.type === 'GOAL') {
-          if (newEvent.teamId === homeTeam.id) setHomeScore(s => s + 1);
-          if (newEvent.teamId === awayTeam.id) setAwayScore(s => s + 1);
-        }
-        
-        // Pause briefly for event if not fast forwarding too much
-        if (speed < 10) {
-          setIsPlaying(false);
-          setTimeout(() => {
-            setCurrentEvent(null);
-            setIsPlaying(true);
-          }, 1500 / speed);
-        }
-      }
+      const currentMinute = Math.floor(minuteRef.current);
+      const newlyVisible = sortedEvents.filter(
+        event => event.minute <= currentMinute && !revealedIdsRef.current.has(event.id),
+      );
 
-      // Update player positions
-      setPlayers(prev => prev.map(p => {
-        let { x, y, targetX, targetY } = p;
-        
-        const dx = targetX - x;
-        const dy = targetY - y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist < 1) {
-          // Assign new target
-          targetX = p.isHome ? 10 + Math.random() * 40 : 50 + Math.random() * 40;
-          targetY = 10 + Math.random() * 80;
-          
-          // If there's a goal event happening soon, move towards the goal
-          const upcomingGoal = events.find(e => e.type === 'GOAL' && e.minute >= minuteRef.current && e.minute < minuteRef.current + 2);
-          if (upcomingGoal) {
-            if (upcomingGoal.teamId === homeTeam.id && p.isHome) {
-              targetX = 85 + Math.random() * 10; // Move to right goal
-              targetY = 40 + Math.random() * 20;
-            } else if (upcomingGoal.teamId === awayTeam.id && !p.isHome) {
-              targetX = 5 + Math.random() * 10; // Move to left goal
-              targetY = 40 + Math.random() * 20;
-            }
-          }
-        } else {
-          // Move
-          const speedFactor = 0.05 * speed;
-          x += dx * speedFactor;
-          y += dy * speedFactor;
-        }
-        
-        return { ...p, x, y, targetX, targetY };
-      }));
+      if (newlyVisible.length > 0) {
+        newlyVisible.forEach(event => revealedIdsRef.current.add(event.id));
+        setRevealedEventIds(prev => [...prev, ...newlyVisible.map(event => event.id)]);
+      }
 
       animationFrameId = requestAnimationFrame(update);
     };
@@ -166,135 +231,151 @@ export function MatchSimulation({ match, homeTeam, awayTeam, events, onComplete 
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [isPlaying, isFinished, speed, currentEvent, events, homeTeam.id, awayTeam.id]);
+  }, [sortedEvents, speed]);
 
   const handleComplete = () => {
-    const finalHomeScore = events.filter(e => e.type === 'GOAL' && e.teamId === homeTeam.id).length;
-    const finalAwayScore = events.filter(e => e.type === 'GOAL' && e.teamId === awayTeam.id).length;
-    
-    onComplete({
-      matchId: match.id,
-      homeScore: finalHomeScore,
-      awayScore: finalAwayScore,
-      events
-    });
+    if (isSubmittingResult) return;
+    setIsSubmittingResult(true);
+    onComplete(result);
   };
 
-  const getEventMessage = (ev: MatchEvent) => {
-    const team = ev.teamId === homeTeam.id ? homeTeam : awayTeam;
-    const player = team.players.find(p => p.id === ev.playerId);
-    if (!player) return '';
-
-    switch (ev.type) {
-      case 'GOAL': return `⚽ GOL do ${team.name}! (${player.name})`;
-      case 'YELLOW_CARD': return `🟨 Cartão Amarelo para ${player.name}`;
-      case 'RED_CARD': return `🟥 Cartão Vermelho para ${player.name}`;
-      case 'SUBSTITUTION': return `🔄 Substituição no ${team.name}`;
-      case 'OFFSIDE': return `🚩 Impedimento de ${player.name}`;
-      default: return '';
-    }
-  };
-
-  const getTeamColor = (team: Team) => {
-    const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
-    let hash = 0;
-    for (let i = 0; i < team.name.length; i++) {
-      hash = team.name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-  };
-
-  const homeColor = getTeamColor(homeTeam);
-  const awayColor = getTeamColor(awayTeam);
+  const timelineStatus =
+    revealedEvents.length > 0
+      ? `${revealedEvents.length} lance${revealedEvents.length > 1 ? 's' : ''} narrado${revealedEvents.length > 1 ? 's' : ''}`
+      : 'Aguardando os primeiros lances';
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between bg-slate-800 p-6 rounded-2xl border border-slate-700">
-        <div className="flex-1 text-right">
-          <h2 className="text-2xl font-bold text-slate-100">{homeTeam.name}</h2>
-          <div className="w-4 h-4 rounded-full inline-block mt-2" style={{ backgroundColor: homeColor }} />
-        </div>
-        
-        <div className="px-8 text-center">
-          <div className="text-4xl font-black font-mono text-white mb-2">
-            {homeScore} - {awayScore}
+      <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex-1 text-center lg:text-right">
+            <h2 className="text-2xl font-bold text-slate-100">{homeTeam.name}</h2>
+            <p className="text-sm text-slate-400">Mandante</p>
           </div>
-          <div className="text-emerald-400 font-mono font-bold text-xl">
-            {minute}'
-          </div>
-        </div>
-        
-        <div className="flex-1 text-left">
-          <h2 className="text-2xl font-bold text-slate-100">{awayTeam.name}</h2>
-          <div className="w-4 h-4 rounded-full inline-block mt-2" style={{ backgroundColor: awayColor }} />
-        </div>
-      </div>
 
-      {/* 2D Field */}
-      <div className="relative w-full aspect-[2/1] bg-green-700 rounded-lg overflow-hidden border-4 border-slate-800 shadow-2xl">
-        {/* Field Markings */}
-        <div className="absolute inset-0 border-2 border-white/30 m-4" />
-        <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-white/30 -translate-x-1/2" />
-        <div className="absolute top-1/2 left-1/2 w-24 h-24 border-2 border-white/30 rounded-full -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute top-1/2 left-1/2 w-2 h-2 bg-white/30 rounded-full -translate-x-1/2 -translate-y-1/2" />
-        
-        {/* Penalty Areas */}
-        <div className="absolute top-1/4 left-4 bottom-1/4 w-32 border-2 border-white/30 border-l-0" />
-        <div className="absolute top-1/4 right-4 bottom-1/4 w-32 border-2 border-white/30 border-r-0" />
-        
-        {/* Goal Areas */}
-        <div className="absolute top-[35%] left-4 bottom-[35%] w-12 border-2 border-white/30 border-l-0" />
-        <div className="absolute top-[35%] right-4 bottom-[35%] w-12 border-2 border-white/30 border-r-0" />
-
-        {/* Players */}
-        {players.map(p => (
-          <div
-            key={p.id}
-            className="absolute w-3 h-3 rounded-full shadow-md transition-all duration-100 -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${p.x}%`,
-              top: `${p.y}%`,
-              backgroundColor: p.isHome ? homeColor : awayColor,
-              border: '1px solid rgba(255,255,255,0.5)'
-            }}
-          />
-        ))}
-
-        {/* Event Overlay */}
-        {currentEvent && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-10">
-            <div className="bg-slate-900/90 px-8 py-4 rounded-2xl border border-slate-700 text-2xl font-bold text-white shadow-2xl animate-in zoom-in-95 duration-200">
-              {getEventMessage(currentEvent)}
+          <div className="min-w-[220px] text-center">
+            <div className="text-4xl font-black font-mono text-white">
+              {homeScore} - {awayScore}
             </div>
+            <div className="mt-2 text-xl font-bold text-emerald-400">{minute}'</div>
+            <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">{timelineStatus}</p>
           </div>
-        )}
+
+          <div className="flex-1 text-center lg:text-left">
+            <h2 className="text-2xl font-bold text-slate-100">{awayTeam.name}</h2>
+            <p className="text-sm text-slate-400">Visitante</p>
+          </div>
+        </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center justify-between bg-slate-800 p-4 rounded-xl border border-slate-700">
+      <div className="rounded-2xl border border-slate-700 bg-slate-800 p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-slate-100">Linha do tempo da partida</h3>
+            {sequenceLabel && <p className="mt-1 text-xs font-medium text-emerald-400">{sequenceLabel}</p>}
+            <p className="text-sm text-slate-400">Os eventos aparecem em ordem cronológica, de cima para baixo.</p>
+          </div>
+          {isFinished && (
+            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">
+              Encerrado
+            </span>
+          )}
+        </div>
+
+        <div className="max-h-[28rem] overflow-y-auto rounded-xl bg-slate-900/70 p-4">
+          <div className="relative space-y-4 pl-8">
+            <div className="absolute bottom-0 left-3 top-0 w-px bg-slate-700" />
+
+            {revealedEvents.length === 0 && (
+              <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900 p-4 text-sm text-slate-400">
+                A partida começou. Os lances vão aparecendo aqui conforme o relógio avança.
+              </div>
+            )}
+
+            {revealedEvents.map(event => (
+              <div key={event.id} className="relative">
+                <div className="absolute left-[-1.95rem] top-5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-slate-950 text-slate-200">
+                  {event.icon}
+                </div>
+
+                <div
+                  className={cn(
+                    'rounded-2xl border px-4 py-4 shadow-sm',
+                    event.accentClass,
+                    event.isHome ? 'mr-8' : 'ml-8',
+                  )}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-[0.18em] text-slate-200/80">
+                        {event.teamName}
+                      </p>
+                      <h4 className="text-lg font-bold text-white">{event.title}</h4>
+                    </div>
+                    <span className="text-lg font-black text-white">{event.minute}'</span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-200">{event.description}</p>
+                </div>
+              </div>
+            ))}
+
+            {isFinished && (
+              <div className="relative">
+                <div className="absolute left-[-1.95rem] top-5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-lg font-bold text-white">Fim de jogo</h4>
+                      <p className="text-sm text-slate-200">
+                        {homeTeam.name} {homeScore} x {awayScore} {awayTeam.name}
+                      </p>
+                    </div>
+                    <span className="text-lg font-black text-emerald-300">90'</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={timelineEndRef} />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-800 p-4">
         <div className="flex gap-2">
           <button
             onClick={() => setIsPlaying(!isPlaying)}
             disabled={isFinished}
-            className="p-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-colors disabled:opacity-50"
+            className="rounded-lg bg-slate-700 p-3 text-white transition-colors hover:bg-slate-600 disabled:opacity-50"
           >
-            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+            {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
           </button>
           <button
             onClick={() => setSpeed(1)}
-            className={cn("px-4 py-2 rounded-lg font-bold transition-colors", speed === 1 ? "bg-emerald-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600")}
+            className={cn(
+              'rounded-lg px-4 py-2 font-bold transition-colors',
+              speed === 1 ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600',
+            )}
           >
             1x
           </button>
           <button
             onClick={() => setSpeed(2)}
-            className={cn("px-4 py-2 rounded-lg font-bold transition-colors", speed === 2 ? "bg-emerald-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600")}
+            className={cn(
+              'rounded-lg px-4 py-2 font-bold transition-colors',
+              speed === 2 ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600',
+            )}
           >
             2x
           </button>
           <button
             onClick={() => setSpeed(10)}
-            className={cn("px-4 py-2 rounded-lg font-bold transition-colors", speed === 10 ? "bg-emerald-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600")}
+            className={cn(
+              'rounded-lg px-4 py-2 font-bold transition-colors',
+              speed === 10 ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600',
+            )}
           >
             10x
           </button>
@@ -303,10 +384,11 @@ export function MatchSimulation({ match, homeTeam, awayTeam, events, onComplete 
         {isFinished && (
           <button
             onClick={handleComplete}
-            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 animate-in fade-in slide-in-from-right-4"
+            disabled={isSubmittingResult}
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white transition-all hover:bg-emerald-500 shadow-lg shadow-emerald-900/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <CheckCircle2 className="w-5 h-5" />
-            Concluir Rodada
+            <CheckCircle2 className="h-5 w-5" />
+            {isSubmittingResult ? 'Concluindo...' : completeLabel}
           </button>
         )}
       </div>

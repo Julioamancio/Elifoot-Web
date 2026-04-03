@@ -1,7 +1,209 @@
 import { Player, Team, Position, Competition, TeamStats } from '../types/game';
+import { ensureTeamSponsors } from './sponsorship';
+import { createPlayerContract, ensureTeamAcademy, recalculatePlayerEconomics } from './playerLifecycle';
+import { ensureTeamCommercial } from './commercial';
+
+const DEFAULT_SEASON_YEAR = 2026;
 
 const FIRST_NAMES = ['João', 'Pedro', 'Lucas', 'Mateus', 'Gabriel', 'Enzo', 'Valentim', 'Arthur', 'Carlos', 'Eduardo', 'Luis', 'Fernando', 'Rafael', 'Diego', 'Marcelo', 'Alex', 'Bruno', 'Thiago', 'Felipe', 'Gustavo', 'John', 'David', 'Michael', 'Chris', 'James', 'Robert', 'William', 'Joseph', 'Thomas', 'Charles'];
 const LAST_NAMES = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Rodrigues', 'Ferreira', 'Alves', 'Pereira', 'Lima', 'Gomes', 'Costa', 'Ribeiro', 'Martins', 'Carvalho', 'Almeida', 'Lopes', 'Soares', 'Fernandes', 'Vieira', 'Gomes', 'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
+
+const BRAZIL_STATE_OVERRIDES: Record<string, string> = {
+  'FLAMENGO': 'RJ',
+  'PALMEIRAS': 'SP',
+  'CRUZEIRO': 'MG',
+  'MIRASSOL': 'SP',
+  'FLUMINENSE': 'RJ',
+  'BAHIA': 'BA',
+  'BOTAFOGO': 'RJ',
+  'SAO PAULO': 'SP',
+  'RED BULL BRAGANTINO': 'SP',
+  'CORINTHIANS': 'SP',
+  'GREMIO': 'RS',
+  'VASCO': 'RJ',
+  'CLUBE ATLETICO MINEIRO': 'MG',
+  'SANTOS': 'SP',
+  'VITORIA': 'BA',
+  'INTERNACIONAL': 'RS',
+  'CORITIBA': 'PR',
+  'CHAPECOENSE': 'SC',
+  'REMO': 'PA',
+  'CEARA': 'CE',
+  'FORTALEZA': 'CE',
+  'JUVENTUDE': 'RS',
+  'SPORT': 'PE',
+  'PONTE PRETA': 'SP',
+  'LONDRINA': 'PR',
+  'NAUTICO': 'PE',
+  'SAO BERNARDO': 'SP',
+  'CRICIUMA': 'SC',
+  'GOIAS': 'GO',
+  'NOVORIZONTINO': 'SP',
+  'CRB': 'AL',
+  'AVAI': 'SC',
+  'CUIABA': 'MT',
+  'VILA NOVA': 'GO',
+  'TOMBENSE': 'MG',
+  'CSA': 'AL',
+  'INDEPENDENCIA': 'AC',
+  'GALVEZ': 'AC',
+  'ASA': 'AL',
+  'CSE': 'AL',
+  'TREM': 'AP',
+  'ORATORIO': 'AP',
+  'MANAUS': 'AM',
+  'JACUIPENSE': 'BA',
+  'TIROL': 'CE',
+  'FERROVIARIO': 'CE',
+  'MARACANA': 'CE',
+  'GAMA': 'DF',
+  'CRAC': 'GO',
+  'ABECAT': 'GO',
+  'INHUMAS': 'GO',
+  'IMPERATRIZ': 'MA',
+  'IAPE': 'MA',
+  'PRIMAVERA': 'MT',
+  'MIXTO': 'MT',
+  'PANTANAL': 'MS',
+  'BETIM': 'MG',
+  'DEMOCRATA GV': 'MG',
+  'UBERLANDIA': 'MG',
+  'TUNA LUSO': 'PA',
+  'SOUSA': 'PB',
+  'SERRA BRANCA': 'PB',
+  'AZURIZ': 'PR',
+  'CIANORTE': 'PR',
+  'MAGUARY': 'PE',
+  'DECISAO': 'PE',
+  'PIAUI': 'PI',
+  'MADUREIRA': 'RJ',
+  'LAGUNA': 'RN',
+  'BRASIL DE PELOTAS': 'RS',
+  'GUARANY DE BAGE': 'RS',
+  'PORTO VELHO': 'RO',
+  'GUAPORE': 'RO',
+  'GAS': 'RR',
+  'JOINVILLE': 'SC',
+  'SANTA CATARINA': 'SC',
+  'BLUMENAU': 'SC',
+  'PORTUGUESA': 'SP',
+  'VELO CLUBE': 'SP',
+  'NOROESTE': 'SP',
+  'LAGARTO': 'SE',
+  'SERGIPE': 'SE',
+  'ARAGUAINA': 'TO',
+  'TOCANTINOPOLIS': 'TO',
+  'MANAUARA': 'AM',
+  'CEILANDIA': 'DF',
+  'GOIATUBA': 'GO',
+  'CENTRAL': 'PE',
+  'ALTOS': 'PI',
+  'MARICA': 'RJ',
+  'BRASILIENSE': 'DF',
+  'POUSO ALEGRE': 'MG',
+  'HUMAITA': 'AC',
+  'IGUATU': 'CE',
+  'REAL NOROESTE': 'ES',
+  'TREZE': 'PB',
+  'MOTO CLUB': 'MA',
+  'PARNAHYBA': 'PI',
+};
+
+const normalizeClubName = (name: string) =>
+  name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+
+const inferBrazilianState = (clubName: string, fallbackState = '') => {
+  const normalizedName = normalizeClubName(clubName);
+  const suffixMatch = normalizedName.match(/-([A-Z]{2})$/);
+  if (suffixMatch) {
+    return suffixMatch[1];
+  }
+
+  return BRAZIL_STATE_OVERRIDES[normalizedName] || fallbackState;
+};
+
+const getResolvedState = (country: string, clubName: string, fallbackState = '') => {
+  if (country === 'BR') {
+    return inferBrazilianState(clubName, fallbackState);
+  }
+
+  return fallbackState;
+};
+
+const buildCompetitionStats = (): Record<Competition, TeamStats> => ({
+  LEAGUE: emptyStats(),
+  REGIONAL: emptyStats(),
+  NATIONAL_CUP: emptyStats(),
+  CONTINENTAL: emptyStats(),
+  CONTINENTAL_SECONDARY: emptyStats(),
+  WORLD_CUP: emptyStats(),
+  OLYMPICS: emptyStats(),
+});
+
+const getPlayerSelectionScore = (player: Player) => {
+  const goals = player.goals || 0;
+  const assists = player.assists || 0;
+  const averageRating = player.averageRating ?? 6;
+  const seasonMinutes = player.seasonMinutes ?? player.matchesPlayed * 90;
+  const form = player.form ?? averageRating;
+
+  return (
+    goals * 6 +
+    assists * 4 +
+    averageRating * 8 +
+    (seasonMinutes / 90) * 0.35 +
+    form * 6 +
+    player.overall * 1.2
+  );
+};
+
+const appendUniqueHistory = <T,>(current: T[] | undefined, entries: T[]) => [...new Set([...(current || []), ...entries])];
+
+const buildOlympicSquad = (players: Player[]) => {
+  const under23 = [...players]
+    .filter(player => player.age <= 23)
+    .sort((a, b) => getPlayerSelectionScore(b) - getPlayerSelectionScore(a));
+  const overage = [...players]
+    .filter(player => player.age > 23)
+    .sort((a, b) => getPlayerSelectionScore(b) - getPlayerSelectionScore(a));
+
+  const limits: Record<Position, number> = { GK: 2, DEF: 5, MID: 6, ATK: 5 };
+  const counts: Record<Position, number> = { GK: 0, DEF: 0, MID: 0, ATK: 0 };
+  const squad: Player[] = [];
+  let overageUsed = 0;
+
+  const tryAdd = (player: Player, allowOverage: boolean) => {
+    if (squad.some(current => current.id === player.id)) return;
+    if (counts[player.position] >= limits[player.position]) return;
+    if (player.age > 23 && (!allowOverage || overageUsed >= 3)) return;
+
+    counts[player.position] += 1;
+    if (player.age > 23) overageUsed += 1;
+    squad.push({ ...player, isStarter: squad.length < 11 });
+  };
+
+  under23.forEach(player => {
+    if (squad.length < 18) tryAdd(player, false);
+  });
+
+  overage.forEach(player => {
+    if (squad.length < 18) tryAdd(player, true);
+  });
+
+  [...under23, ...overage].forEach(player => {
+    if (squad.length < 18 && !squad.some(current => current.id === player.id)) {
+      squad.push({ ...player, isStarter: squad.length < 11 });
+    }
+  });
+
+  return squad.slice(0, 18);
+};
 
 const generateName = () => {
   const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
@@ -21,7 +223,7 @@ const generatePlayer = (position: Position, baseOverall: number, isStarter: bool
   // Salary is roughly 1% of value per year, divided by 12 for monthly, simplified here
   const salary = Math.round(value * 0.01 / 1000) * 1000;
 
-  return {
+  const basePlayer: Player = {
     id: Math.random().toString(36).substr(2, 9),
     name: generateName(),
     position,
@@ -36,8 +238,39 @@ const generatePlayer = (position: Position, baseOverall: number, isStarter: bool
     redCards: 0,
     value,
     salary,
-    nationality: nationality || 'BR'
+    nationality: nationality || 'BR',
+    seasonMinutes: 0,
+    averageRating: 0,
+    ratingTotal: 0,
+    ratingSamples: 0,
+    form: 6,
+    nationalCaps: 0,
+    nationalGoals: 0,
+    nationalCallUpHistory: [],
+    nationalTournamentHistory: [],
+    yellowCardsSeason: 0,
+    redCardsSeason: 0,
+    disciplinary: {},
+    potential: Math.max(overall, Math.min(99, overall + 4 + Math.floor(Math.random() * 12))),
+    status: 'ACTIVE',
+    cleanSheets: 0,
+    saves: 0,
+    savePercentage: 0,
+    keyPasses: 0,
+    tackles: 0,
+    interceptions: 0,
+    passAccuracy: 0,
+    titlesWon: 0,
+    youthProspect: false,
   };
+
+  return recalculatePlayerEconomics(
+    {
+      ...basePlayer,
+      contract: createPlayerContract(basePlayer, DEFAULT_SEASON_YEAR),
+    },
+    DEFAULT_SEASON_YEAR,
+  );
 };
 
 const generateSquad = (baseOverall: number, country: string): Player[] => {
@@ -674,12 +907,18 @@ export const TEAM_TEMPLATES = [
 
 ];
 
-export const generateNationalTeams = (clubTeams: Team[]): Team[] => {
+export const generateNationalTeams = (
+  clubTeams: Team[],
+  seasonYear: number = DEFAULT_SEASON_YEAR,
+  internationalCompetitions: Competition[] = [],
+): Team[] => {
   const nationalTeams: Team[] = [];
   const playersByCountry: Record<string, Player[]> = {};
+  const clubCountryLookup = new Map<string, Team['continent']>();
 
   // Group all players by nationality
   clubTeams.forEach(team => {
+    clubCountryLookup.set(team.country, team.continent);
     team.players.forEach(player => {
       const nat = player.nationality || team.country;
       if (!playersByCountry[nat]) playersByCountry[nat] = [];
@@ -690,10 +929,12 @@ export const generateNationalTeams = (clubTeams: Team[]): Team[] => {
   // Create a national team for each country that has enough players
   Object.entries(playersByCountry).forEach(([country, players]) => {
     if (players.length >= 22) {
-      // Sort by overall descending
-      players.sort((a, b) => b.overall - a.overall);
+      players.sort((a, b) => {
+        const scoreDelta = getPlayerSelectionScore(b) - getPlayerSelectionScore(a);
+        if (scoreDelta !== 0) return scoreDelta;
+        return b.overall - a.overall;
+      });
       
-      // Select best 22 players (2 GK, 8 DEF, 8 MID, 4 ATK)
       const selectedPlayers: Player[] = [];
       const counts = { GK: 0, DEF: 0, MID: 0, ATK: 0 };
       
@@ -712,6 +953,16 @@ export const generateNationalTeams = (clubTeams: Team[]): Team[] => {
         }
       }
 
+      selectedPlayers.forEach(player => {
+        player.nationalCallUpHistory = appendUniqueHistory(player.nationalCallUpHistory, [seasonYear]);
+        player.nationalTournamentHistory = appendUniqueHistory(
+          player.nationalTournamentHistory,
+          internationalCompetitions.map(competition => `${competition}_${seasonYear}`),
+        );
+        player.nationalCaps = player.nationalCaps || 0;
+        player.nationalGoals = player.nationalGoals || 0;
+      });
+
       const overall = Math.round(selectedPlayers.filter(p => p.isStarter).reduce((acc, p) => acc + p.overall, 0) / 11);
 
       nationalTeams.push({
@@ -719,32 +970,32 @@ export const generateNationalTeams = (clubTeams: Team[]): Team[] => {
         name: `Seleção ${country}`,
         overall,
         isUserControlled: false,
-        players: selectedPlayers,
-        finances: 0,
-        historicalPoints: 0,
-        division: 0, // 0 for national teams
-        country: country,
-        state: '',
-        continent: 'EU', // Default, doesn't matter much for WC
-        stats: {
-          LEAGUE: emptyStats(),
-          REGIONAL: emptyStats(),
-          NATIONAL_CUP: emptyStats(),
-          CONTINENTAL: emptyStats(),
-          CONTINENTAL_SECONDARY: emptyStats(),
-          WORLD_CUP: emptyStats()
-        }
-      });
-    }
+      players: selectedPlayers,
+      finances: 0,
+      historicalPoints: 0,
+      fanBase: 1_500_000,
+      division: 0, // 0 for national teams
+      country: country,
+      state: '',
+      continent: clubCountryLookup.get(country) || 'EU',
+      regionalDivision: 0,
+        competitionSquads: internationalCompetitions.includes('OLYMPICS')
+          ? { OLYMPICS: buildOlympicSquad(players) }
+          : undefined,
+      stats: buildCompetitionStats()
+    });
+  }
   });
 
   return nationalTeams;
 };
 
 export const generateTeams = (): Team[] => {
-  return TEAM_TEMPLATES.map(t => {
+  const generatedTeams = TEAM_TEMPLATES.map(t => {
     const players = generateSquad(t.str, t.country);
     const overall = Math.round(players.filter(p => p.isStarter).reduce((acc, p) => acc + p.overall, 0) / 11);
+    const resolvedState = getResolvedState(t.country, t.name, t.state);
+    const regionalDivision = t.country === 'BR' ? (t.div <= 2 ? 1 : 2) : t.div;
     
     // Initial balance based on division (SAF fixed value)
     const baseBalance = t.div === 1 ? 100000000 : t.div === 2 ? 40000000 : t.div === 3 ? 10000000 : 2000000;
@@ -778,16 +1029,19 @@ export const generateTeams = (): Team[] => {
       stadium,
       division: t.div,
       country: t.country,
-      state: t.state,
+      state: resolvedState,
       continent: t.cont as 'SA' | 'EU' | 'NA',
-      stats: {
-        LEAGUE: emptyStats(),
-        REGIONAL: emptyStats(),
-        NATIONAL_CUP: emptyStats(),
-        CONTINENTAL: emptyStats(),
-        CONTINENTAL_SECONDARY: emptyStats(),
-        WORLD_CUP: emptyStats()
-      }
+      regionalDivision,
+      stats: buildCompetitionStats()
     };
   });
+
+return generatedTeams.map(team =>
+  ensureTeamCommercial(
+    ensureTeamAcademy(
+      ensureTeamSponsors(team, DEFAULT_SEASON_YEAR, generatedTeams),
+      DEFAULT_SEASON_YEAR,
+    ),
+  ),
+);
 };
