@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 import { MatchSimulation } from './MatchSimulation';
 import { simulateMatch } from '../game/engine';
 import { Match, MatchEvent } from '../types/game';
+import { TeamFlag } from './ui/TeamFlag';
 
 export function MatchDay() {
   const teams = useGameStore(state => state.teams);
@@ -213,7 +214,10 @@ export function MatchDay() {
                 {offers.map(team => team && (
                   <div key={team.id} className="flex items-center justify-between p-4 bg-slate-900 rounded-xl border border-slate-700">
                     <div className="text-left">
-                      <p className="font-bold text-lg text-slate-200">{team.name}</p>
+                      <p className="flex items-center gap-2 font-bold text-lg text-slate-200">
+                        <TeamFlag country={team.country} teamName={team.name} size="xs" />
+                        <span>{team.name}</span>
+                      </p>
                       <p className="text-sm text-slate-400">Divisão {team.division} - {team.country}</p>
                     </div>
                     <button 
@@ -230,9 +234,10 @@ export function MatchDay() {
                 <div className="pt-4 mt-4 border-t border-slate-700">
                   <button 
                     onClick={() => useGameStore.getState().nextSeason()}
-                    className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all w-full"
+                    className="flex w-full items-center justify-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
                   >
-                    Continuar no {userTeam?.name} (Nova Temporada)
+                    {userTeam ? <TeamFlag country={userTeam.country} teamName={userTeam.name} size="xs" className="border-white/20 bg-white/10" /> : null}
+                    <span>Continuar no {userTeam?.name} (Nova Temporada)</span>
                   </button>
                 </div>
               </div>
@@ -241,9 +246,10 @@ export function MatchDay() {
                 <p className="text-slate-500 italic">Nenhuma proposta recebida no momento.</p>
                 <button 
                   onClick={() => useGameStore.getState().nextSeason()}
-                  className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
                 >
-                  Continuar no {userTeam?.name} (Nova Temporada)
+                  {userTeam ? <TeamFlag country={userTeam.country} teamName={userTeam.name} size="xs" className="border-white/20 bg-white/10" /> : null}
+                  <span>Continuar no {userTeam?.name} (Nova Temporada)</span>
                 </button>
               </div>
             )}
@@ -260,7 +266,10 @@ export function MatchDay() {
                 {offers.map(team => team && (
                   <div key={team.id} className="flex items-center justify-between p-4 bg-slate-900 rounded-xl border border-slate-700">
                     <div className="text-left">
-                      <p className="font-bold text-lg text-slate-200">{team.name}</p>
+                      <p className="flex items-center gap-2 font-bold text-lg text-slate-200">
+                        <TeamFlag country={team.country} teamName={team.name} size="xs" />
+                        <span>{team.name}</span>
+                      </p>
                       <p className="text-sm text-slate-400">Divisão {team.division} - {team.country}</p>
                     </div>
                     <button 
@@ -277,9 +286,10 @@ export function MatchDay() {
                 <div className="pt-4 mt-4 border-t border-slate-700">
                   <button 
                     onClick={() => useGameStore.getState().nextSeason()}
-                    className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all w-full"
+                    className="flex w-full items-center justify-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
                   >
-                    Continuar no {userTeam?.name} (Nova Temporada)
+                    {userTeam ? <TeamFlag country={userTeam.country} teamName={userTeam.name} size="xs" className="border-white/20 bg-white/10" /> : null}
+                    <span>Continuar no {userTeam?.name} (Nova Temporada)</span>
                   </button>
                 </div>
               </div>
@@ -288,9 +298,10 @@ export function MatchDay() {
                 <p className="text-slate-500 italic">Nenhuma proposta recebida no momento.</p>
                 <button 
                   onClick={() => useGameStore.getState().nextSeason()}
-                  className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
                 >
-                  Continuar no {userTeam?.name} (Nova Temporada)
+                  {userTeam ? <TeamFlag country={userTeam.country} teamName={userTeam.name} size="xs" className="border-white/20 bg-white/10" /> : null}
+                  <span>Continuar no {userTeam?.name} (Nova Temporada)</span>
                 </button>
               </div>
             )}
@@ -428,8 +439,9 @@ export function MatchDay() {
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 text-right">
-                      <p className={cn("font-bold text-lg", leftIsUser ? "text-emerald-400" : "text-slate-200")}>
-                        {leftTeam.name}
+                      <p className={cn("flex items-center justify-end gap-2 font-bold text-lg", leftIsUser ? "text-emerald-400" : "text-slate-200")}>
+                        <TeamFlag country={leftTeam.country} teamName={leftTeam.name} size="sm" />
+                        <span>{leftTeam.name}</span>
                       </p>
                     </div>
                     
@@ -444,8 +456,9 @@ export function MatchDay() {
                     </div>
                     
                     <div className="flex-1 text-left">
-                      <p className={cn("font-bold text-lg", rightIsUser ? "text-emerald-400" : "text-slate-200")}>
-                        {rightTeam.name}
+                      <p className={cn("flex items-center gap-2 font-bold text-lg", rightIsUser ? "text-emerald-400" : "text-slate-200")}>
+                        <TeamFlag country={rightTeam.country} teamName={rightTeam.name} size="sm" />
+                        <span>{rightTeam.name}</span>
                       </p>
                     </div>
                   </div>

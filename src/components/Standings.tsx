@@ -4,6 +4,7 @@ import { useGameStore } from '../store/useGameStore';
 import { sortTeamsByCompetitionTable } from '../game/engine';
 import { cn } from '../lib/utils';
 import { Competition, Match, Team } from '../types/game';
+import { TeamFlag } from './ui/TeamFlag';
 
 const formatOrdinal = (position: number) => `${position}°`;
 const INTERNATIONAL_COMPETITIONS: Competition[] = ['WORLD_CUP', 'OLYMPICS'];
@@ -209,7 +210,12 @@ function InternationalCompetitionPanel({
                         {group.table.map((entry, index) => (
                           <tr key={entry.team.id} className={index < 2 ? 'bg-emerald-900/10' : ''}>
                             <td className="px-4 py-3 text-center text-slate-400">{formatOrdinal(index + 1)}</td>
-                            <td className="px-4 py-3 font-medium text-slate-200">{entry.team.name}</td>
+                            <td className="px-4 py-3 font-medium text-slate-200">
+                              <span className="inline-flex items-center gap-2">
+                                <TeamFlag country={entry.team.country} teamName={entry.team.name} size="xs" />
+                                <span>{entry.team.name}</span>
+                              </span>
+                            </td>
                             <td className="px-4 py-3 text-center font-bold text-emerald-400">{entry.points}</td>
                             <td className="px-4 py-3 text-center text-slate-300">{entry.played}</td>
                             <td className="px-4 py-3 text-center text-slate-300">{entry.goalsFor}</td>
@@ -245,11 +251,17 @@ function InternationalCompetitionPanel({
                     return (
                       <div key={match.id} className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-3">
                         <div className="flex items-center justify-between gap-4">
-                          <span className="font-medium text-slate-200">{home.name}</span>
+                          <span className="inline-flex items-center gap-2 font-medium text-slate-200">
+                            <TeamFlag country={home.country} teamName={home.name} size="xs" />
+                            <span>{home.name}</span>
+                          </span>
                           <span className="font-mono font-bold text-white">
                             {match.played ? `${match.homeScore} - ${match.awayScore}` : 'vs'}
                           </span>
-                          <span className="font-medium text-slate-200">{away.name}</span>
+                          <span className="inline-flex items-center gap-2 font-medium text-slate-200">
+                            <TeamFlag country={away.country} teamName={away.name} size="xs" />
+                            <span>{away.name}</span>
+                          </span>
                         </div>
                         {match.played && match.wentToPenalties && (
                           <p className="mt-2 text-xs text-amber-400">Decidido nos pênaltis</p>
@@ -279,7 +291,14 @@ function InternationalCompetitionPanel({
                     <p className="font-medium text-slate-200">
                       {formatOrdinal(index + 1)} {player.name}
                     </p>
-                    <p className="text-xs text-slate-400">{player.nationalTeamName}</p>
+                    <p className="inline-flex items-center gap-2 text-xs text-slate-400">
+                      <TeamFlag
+                        country={participants.find(team => team.name === player.nationalTeamName)?.country}
+                        teamName={player.nationalTeamName}
+                        size="xs"
+                      />
+                      <span>{player.nationalTeamName}</span>
+                    </p>
                   </div>
                   <span className="font-bold text-emerald-400">{player.nationalGoals ?? player.goals}</span>
                 </div>
@@ -299,7 +318,14 @@ function InternationalCompetitionPanel({
               history.map(entry => (
                 <div key={`${entry.year}-${entry.championTeamId}`} className="flex items-center justify-between gap-4">
                   <span className="text-slate-300">{entry.year}</span>
-                  <span className="font-medium text-slate-100">{entry.championName}</span>
+                  <span className="inline-flex items-center gap-2 font-medium text-slate-100">
+                    <TeamFlag
+                      country={teams.find(team => team.id === entry.championTeamId)?.country}
+                      teamName={entry.championName}
+                      size="xs"
+                    />
+                    <span>{entry.championName}</span>
+                  </span>
                 </div>
               ))
             ) : (
@@ -322,7 +348,10 @@ function InternationalCompetitionPanel({
                 <div key={team.id} className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
                   <div className="mb-3 flex items-center justify-between gap-4">
                     <div>
-                      <p className="font-semibold text-slate-100">{team.name}</p>
+                      <p className="inline-flex items-center gap-2 font-semibold text-slate-100">
+                        <TeamFlag country={team.country} teamName={team.name} size="xs" />
+                        <span>{team.name}</span>
+                      </p>
                       <p className="text-xs text-slate-400">{calledPlayers.length} convocados</p>
                     </div>
                     <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
@@ -455,13 +484,16 @@ export function Standings() {
                       )}
                     >
                       <td className="px-6 py-3 text-center font-bold text-slate-500">{formatOrdinal(index + 1)}</td>
-                      <td className="px-6 py-3 font-medium text-slate-200 flex items-center gap-2">
-                        {team.name}
+                      <td className="px-6 py-3 font-medium text-slate-200">
+                        <div className="flex items-center gap-2">
+                          <TeamFlag country={team.country} teamName={team.name} size="xs" />
+                          <span>{team.name}</span>
                         {team.id === userTeamId && (
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                             VOCÊ
                           </span>
                         )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-center font-bold text-emerald-400">{stats.points}</td>
                       <td className="px-4 py-3 text-center text-slate-400">{stats.played}</td>

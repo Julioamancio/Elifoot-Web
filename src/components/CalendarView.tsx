@@ -1,18 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CalendarDays, Newspaper, ShieldAlert, Trophy } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { Competition } from '../types/game';
 import { PageHeader } from './ui/PageHeader';
+import { ScreenTabs } from './ui/ScreenTabs';
+import { TeamFlag } from './ui/TeamFlag';
 
 const getCompetitionLabel = (competition: Competition) => {
   if (competition === 'LEAGUE') return 'Liga Nacional';
   if (competition === 'REGIONAL') return 'Regional';
   if (competition === 'NATIONAL_CUP') return 'Copa Nacional';
   if (competition === 'CONTINENTAL') return 'Continental';
-  if (competition === 'CONTINENTAL_SECONDARY') return 'Continental Secundária';
+  if (competition === 'CONTINENTAL_SECONDARY') return 'Continental Secundaria';
   if (competition === 'WORLD_CUP') return 'World Cup';
   return 'Olympics';
 };
+
+type CalendarTab = 'agenda' | 'rodada' | 'news' | 'season';
 
 export function CalendarView() {
   const teams = useGameStore(state => state.teams);
@@ -25,6 +29,7 @@ export function CalendarView() {
   const recentRoundSummary = useGameStore(state => state.recentRoundSummary);
   const newsFeed = useGameStore(state => state.newsFeed ?? []);
   const seasonReview = useGameStore(state => state.seasonReview);
+  const [activeTab, setActiveTab] = useState<CalendarTab>('agenda');
 
   const userTeam = teams.find(team => team.id === userTeamId);
   const userNationalTeam =
@@ -51,24 +56,29 @@ export function CalendarView() {
     .filter(player => (player.injury?.weeksRemaining ?? 0) > 0)
     .sort((playerA, playerB) => (playerB.injury?.weeksRemaining ?? 0) - (playerA.injury?.weeksRemaining ?? 0));
 
+  const tabs = [
+    { id: 'agenda', label: 'Agenda', icon: <CalendarDays className="h-4 w-4" />, badge: upcomingMatches.length },
+    { id: 'rodada', label: 'Rodada', icon: <Trophy className="h-4 w-4" /> },
+    { id: 'news', label: 'Noticias', icon: <Newspaper className="h-4 w-4" />, badge: Math.min(newsFeed.length, 9) },
+    { id: 'season', label: 'Temporada', icon: <ShieldAlert className="h-4 w-4" />, badge: injuryAlerts.length },
+  ] as const;
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Agenda e Notícias"
-        subtitle="Calendário da temporada, resumo da rodada e a caixa de notícias do clube."
+        title="Agenda da Temporada"
+        subtitle="Tudo separado por foco para caber melhor no celular e ficar mais rapido de consultar."
         icon={<CalendarDays className="h-7 w-7" />}
       />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 xl:col-span-2">
-          <div className="flex items-center gap-3 border-b border-slate-700 bg-slate-900/50 px-6 py-4">
-            <CalendarDays className="h-5 w-5 text-emerald-400" />
-            <div>
-              <h2 className="text-lg font-bold text-slate-100">Próximos compromissos</h2>
-              <p className="text-sm text-slate-400">Semana atual {currentWeek} • temporada {currentYear}</p>
-            </div>
-          </div>
-          <div className="divide-y divide-slate-700/50">
+      <ScreenTabs items={tabs} activeTab={activeTab} onChange={tab => setActiveTab(tab as CalendarTab)} />
+
+      {activeTab === 'agenda' && (
+        <SectionCard
+          title="Proximos compromissos"
+          subtitle={`Semana atual ${currentWeek} • temporada ${currentYear}`}
+        >
+          <div className="space-y-3">
             {upcomingMatches.length > 0 ? (
               upcomingMatches.map(match => {
                 const home = teams.find(team => team.id === match.homeTeamId);
@@ -79,59 +89,37 @@ export function CalendarView() {
                 const rightTeam = userOnAway ? home : away;
 
                 return (
-                  <div key={match.id} className="flex flex-col gap-2 px-6 py-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-                        Semana {match.week} • {getCompetitionLabel(match.competition)}
-                      </p>
-                      <p className="mt-1 text-lg font-semibold text-slate-100">
-                        {leftTeam.name} <span className="text-slate-500">vs</span> {rightTeam.name}
-                      </p>
+                  <div key={match.id} className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                      Semana {match.week} • {getCompetitionLabel(match.competition)}
+                    </p>
+                    <div className="mt-2 flex items-center gap-3 text-lg font-black text-slate-100">
+                      <span className="inline-flex items-center gap-2">
+                        <TeamFlag country={leftTeam.country} teamName={leftTeam.name} size="sm" />
+                        <span>{leftTeam.name}</span>
+                      </span>
+                      <span className="text-slate-500">vs</span>
+                      <span className="inline-flex items-center gap-2">
+                        <TeamFlag country={rightTeam.country} teamName={rightTeam.name} size="sm" />
+                        <span>{rightTeam.name}</span>
+                      </span>
                     </div>
-                    <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
-                      Seu jogo
-                    </span>
                   </div>
                 );
               })
             ) : (
-              <div className="px-6 py-8 text-center text-slate-400">Nenhum jogo futuro encontrado no momento.</div>
+              <p className="text-sm text-slate-400">Nenhum jogo futuro encontrado no momento.</p>
             )}
           </div>
-        </section>
+        </SectionCard>
+      )}
 
-        <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-          <div className="flex items-center gap-3 border-b border-slate-700 bg-slate-900/50 px-6 py-4">
-            <ShieldAlert className="h-5 w-5 text-amber-400" />
-            <div>
-              <h2 className="text-lg font-bold text-slate-100">Departamento Médico</h2>
-              <p className="text-sm text-slate-400">Lesões simples e desfalques atuais</p>
-            </div>
-          </div>
-          <div className="space-y-3 p-6">
-            {injuryAlerts.length > 0 ? (
-              injuryAlerts.map(player => (
-                <div key={player.id} className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-                  <p className="font-semibold text-slate-100">{player.name}</p>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {player.injury?.type} • {player.injury?.weeksRemaining} semana(s) restantes
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-400">Sem lesionados no elenco principal.</p>
-            )}
-          </div>
-        </section>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-          <div className="border-b border-slate-700 bg-slate-900/50 px-6 py-4">
-            <h2 className="text-lg font-bold text-slate-100">Resumo da rodada</h2>
-            <p className="text-sm text-slate-400">Os últimos resultados e manchetes do seu caminho na temporada.</p>
-          </div>
-          <div className="space-y-4 p-6">
+      {activeTab === 'rodada' && (
+        <SectionCard
+          title="Resumo da rodada"
+          subtitle="Os ultimos resultados e manchetes do seu caminho na temporada."
+        >
+          <div className="space-y-4">
             {recentRoundSummary ? (
               <>
                 <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
@@ -158,25 +146,23 @@ export function CalendarView() {
                     </div>
                   ))}
                   {recentRoundSummary.userResults.length === 0 && (
-                    <p className="text-sm text-slate-400">Seu time não entrou em campo na última semana.</p>
+                    <p className="text-sm text-slate-400">Seu time nao entrou em campo na ultima semana.</p>
                   )}
                 </div>
               </>
             ) : (
-              <p className="text-sm text-slate-400">Nenhum resumo disponível ainda.</p>
+              <p className="text-sm text-slate-400">Nenhum resumo disponivel ainda.</p>
             )}
           </div>
-        </section>
+        </SectionCard>
+      )}
 
-        <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-          <div className="flex items-center gap-3 border-b border-slate-700 bg-slate-900/50 px-6 py-4">
-            <Newspaper className="h-5 w-5 text-sky-400" />
-            <div>
-              <h2 className="text-lg font-bold text-slate-100">Caixa de Notícias</h2>
-              <p className="text-sm text-slate-400">Estilo FutBoss: curta, direta e focada no que importa.</p>
-            </div>
-          </div>
-          <div className="space-y-3 p-6">
+      {activeTab === 'news' && (
+        <SectionCard
+          title="Caixa de Noticias"
+          subtitle="Estilo FutBoss: curta, direta e focada no que importa."
+        >
+          <div className="space-y-3">
             {newsFeed.slice(0, 8).map(item => (
               <article key={item.id} className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -188,65 +174,125 @@ export function CalendarView() {
                 <p className="mt-2 text-sm text-slate-400">{item.body}</p>
               </article>
             ))}
-            {newsFeed.length === 0 && <p className="text-sm text-slate-400">Nenhuma notícia publicada ainda.</p>}
+            {newsFeed.length === 0 && <p className="text-sm text-slate-400">Nenhuma noticia publicada ainda.</p>}
           </div>
-        </section>
-      </div>
-
-      {seasonReview && (
-        <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-          <div className="flex items-center gap-3 border-b border-slate-700 bg-slate-900/50 px-6 py-4">
-            <Trophy className="h-5 w-5 text-amber-400" />
-            <div>
-              <h2 className="text-lg font-bold text-slate-100">Fim de temporada {seasonReview.year}</h2>
-              <p className="text-sm text-slate-400">Campeões, acessos e quedas mais recentes.</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-6 p-6 xl:grid-cols-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Campeões</p>
-              <div className="mt-3 space-y-2">
-                {seasonReview.leagueChampions.slice(0, 8).map(champion => (
-                  <div key={`${champion.country}-${champion.division}`} className="rounded-xl border border-slate-700 bg-slate-900/30 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-100">{champion.teamName}</p>
-                    <p className="text-xs text-slate-400">
-                      {champion.country} • Divisão {champion.division}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-400">Promovidos</p>
-              <div className="mt-3 space-y-2">
-                {seasonReview.promoted.map(team => (
-                  <div key={`${team.teamId}-up`} className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-100">{team.teamName}</p>
-                    <p className="text-xs text-slate-400">
-                      Div {team.fromDivision} → Div {team.toDivision}
-                    </p>
-                  </div>
-                ))}
-                {seasonReview.promoted.length === 0 && <p className="text-sm text-slate-400">Nenhum acesso registrado.</p>}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-rose-400">Rebaixados</p>
-              <div className="mt-3 space-y-2">
-                {seasonReview.relegated.map(team => (
-                  <div key={`${team.teamId}-down`} className="rounded-xl border border-rose-500/20 bg-rose-500/5 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-100">{team.teamName}</p>
-                    <p className="text-xs text-slate-400">
-                      Div {team.fromDivision} → Div {team.toDivision}
-                    </p>
-                  </div>
-                ))}
-                {seasonReview.relegated.length === 0 && <p className="text-sm text-slate-400">Nenhuma queda registrada.</p>}
-              </div>
-            </div>
-          </div>
-        </section>
+        </SectionCard>
       )}
+
+      {activeTab === 'season' && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <SectionCard
+            title="Departamento Medico"
+            subtitle="Lesoes simples e desfalques atuais."
+          >
+            <div className="space-y-3">
+              {injuryAlerts.length > 0 ? (
+                injuryAlerts.map(player => (
+                  <div key={player.id} className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+                    <p className="font-semibold text-slate-100">{player.name}</p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {player.injury?.type} • {player.injury?.weeksRemaining} semana(s) restantes
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-400">Sem lesionados no elenco principal.</p>
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title={seasonReview ? `Fim de temporada ${seasonReview.year}` : 'Revisao de temporada'}
+            subtitle="Campeoes, acessos e quedas mais recentes."
+          >
+            {seasonReview ? (
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Campeoes</p>
+                  <div className="space-y-2">
+                    {seasonReview.leagueChampions.slice(0, 5).map(champion => (
+                      <div key={`${champion.country}-${champion.division}`} className="rounded-xl border border-slate-700 bg-slate-900/30 px-4 py-3">
+                        <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-100">
+                          <TeamFlag country={champion.country} teamName={champion.teamName} size="xs" />
+                          <span>{champion.teamName}</span>
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {champion.country} • Divisao {champion.division}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <StatusList title="Promovidos" items={seasonReview.promoted} tone="emerald" />
+                  <StatusList title="Rebaixados" items={seasonReview.relegated} tone="rose" />
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">A revisao da temporada aparece quando um ciclo termina.</p>
+            )}
+          </SectionCard>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectionCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
+      <div className="border-b border-slate-700 bg-slate-900/50 px-6 py-4">
+        <h2 className="text-lg font-bold text-slate-100">{title}</h2>
+        {subtitle ? <p className="text-sm text-slate-400">{subtitle}</p> : null}
+      </div>
+      <div className="p-6">{children}</div>
+    </section>
+  );
+}
+
+function StatusList({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: Array<{ teamId: string; teamName: string; fromDivision: number; toDivision: number }>;
+  tone: 'emerald' | 'rose';
+}) {
+  const cardClass =
+    tone === 'emerald'
+      ? 'border-emerald-500/20 bg-emerald-500/5'
+      : 'border-rose-500/20 bg-rose-500/5';
+  const titleClass = tone === 'emerald' ? 'text-emerald-400' : 'text-rose-400';
+
+  return (
+    <div>
+      <p className={`mb-2 text-xs font-bold uppercase tracking-[0.2em] ${titleClass}`}>{title}</p>
+      <div className="space-y-2">
+        {items.length > 0 ? (
+          items.map(team => (
+            <div key={`${team.teamId}-${title}`} className={`rounded-xl border px-4 py-3 ${cardClass}`}>
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-100">
+                <TeamFlag teamName={team.teamName} size="xs" />
+                <span>{team.teamName}</span>
+              </p>
+              <p className="text-xs text-slate-400">
+                Div {team.fromDivision} → Div {team.toDivision}
+              </p>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-slate-400">Nenhum registro.</p>
+        )}
+      </div>
     </div>
   );
 }

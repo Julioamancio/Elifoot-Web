@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Match, MatchEvent, Team } from '../types/game';
 import { cn } from '../lib/utils';
+import { TeamFlag } from './ui/TeamFlag';
 
 interface MatchSimulationProps {
   match: Match;
@@ -249,7 +250,10 @@ export function MatchSimulation({
       <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex-1 text-center lg:text-right">
-            <h2 className="text-2xl font-bold text-slate-100">{homeTeam.name}</h2>
+            <h2 className="flex items-center justify-center gap-3 text-2xl font-bold text-slate-100 lg:justify-end">
+              <span>{homeTeam.name}</span>
+              <TeamFlag country={homeTeam.country} teamName={homeTeam.name} size="md" />
+            </h2>
             <p className="text-sm text-slate-400">Mandante</p>
           </div>
 
@@ -262,7 +266,10 @@ export function MatchSimulation({
           </div>
 
           <div className="flex-1 text-center lg:text-left">
-            <h2 className="text-2xl font-bold text-slate-100">{awayTeam.name}</h2>
+            <h2 className="flex items-center justify-center gap-3 text-2xl font-bold text-slate-100 lg:justify-start">
+              <TeamFlag country={awayTeam.country} teamName={awayTeam.name} size="md" />
+              <span>{awayTeam.name}</span>
+            </h2>
             <p className="text-sm text-slate-400">Visitante</p>
           </div>
         </div>
@@ -307,8 +314,13 @@ export function MatchSimulation({
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-bold uppercase tracking-[0.18em] text-slate-200/80">
-                        {event.teamName}
+                      <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-slate-200/80">
+                        <TeamFlag
+                          country={event.isHome ? homeTeam.country : awayTeam.country}
+                          teamName={event.teamName}
+                          size="xs"
+                        />
+                        <span>{event.teamName}</span>
                       </p>
                       <h4 className="text-lg font-bold text-white">{event.title}</h4>
                     </div>
@@ -328,8 +340,12 @@ export function MatchSimulation({
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <h4 className="text-lg font-bold text-white">Fim de jogo</h4>
-                      <p className="text-sm text-slate-200">
-                        {homeTeam.name} {homeScore} x {awayScore} {awayTeam.name}
+                      <p className="flex flex-wrap items-center gap-2 text-sm text-slate-200">
+                        <TeamFlag country={homeTeam.country} teamName={homeTeam.name} size="xs" />
+                        <span>{homeTeam.name}</span>
+                        <span>{homeScore} x {awayScore}</span>
+                        <TeamFlag country={awayTeam.country} teamName={awayTeam.name} size="xs" />
+                        <span>{awayTeam.name}</span>
                       </p>
                     </div>
                     <span className="text-lg font-black text-emerald-300">90'</span>

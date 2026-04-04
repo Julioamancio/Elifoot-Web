@@ -1,8 +1,22 @@
-import React, { useState } from 'react';
-import { Trophy, Users, Activity, Calendar, DollarSign, LogOut } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import {
+  Activity,
+  Bell,
+  Calendar,
+  DollarSign,
+  LogOut,
+  Newspaper,
+  Trophy,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { PageHeader } from './ui/PageHeader';
 import { ConfirmModal } from './ui/ConfirmModal';
+import { ScreenTabs } from './ui/ScreenTabs';
+import { TeamFlag } from './ui/TeamFlag';
+
+type DashboardTab = 'overview' | 'squad' | 'season' | 'finance' | 'news';
 
 export function Dashboard() {
   const teams = useGameStore(state => state.teams);
@@ -15,6 +29,7 @@ export function Dashboard() {
   const newsFeed = useGameStore(state => state.newsFeed ?? []);
   const resetGame = useGameStore(state => state.resetGame);
   const [isRetireModalOpen, setIsRetireModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
 
   const userTeam = teams.find(team => team.id === userTeamId);
   const userNationalTeam =
@@ -62,188 +77,266 @@ export function Dashboard() {
   const leagueStats = userTeam.stats.LEAGUE;
   const userPlayer = gameMode === 'player' ? userTeam.players.find(player => player.id === userPlayerId) : null;
   const injuredPlayers = userTeam.players.filter(player => (player.injury?.weeksRemaining ?? 0) > 0);
+  const topScorers = userTeam.players
+    .filter(player => player.goals > 0)
+    .sort((playerA, playerB) => playerB.goals - playerA.goals)
+    .slice(0, 5);
+  const urgentItems = useMemo(
+    () => [
+      ...(injuredPlayers.length > 0
+        ? [
+            {
+              id: 'injuries',
+              title: `${injuredPlayers.length} lesionado(s) no elenco`,
+              body: 'Vale revisar o plantel antes da próxima rodada.',
+              tone: 'amber' as const,
+            },
+          ]
+        : []),
+      ...(recentRoundSummary?.headlines.slice(0, 2).map((headline, index) => ({
+        id: `headline-${index}`,
+        title: 'Resumo da rodada',
+        body: headline,
+        tone: 'sky' as const,
+      })) ?? []),
+      ...(newsFeed.slice(0, 2).map(item => ({
+        id: item.id,
+        title: item.title,
+        body: item.body,
+        tone: 'emerald' as const,
+      })) ?? []),
+    ],
+    [injuredPlayers.length, newsFeed, recentRoundSummary],
+  );
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      maximumFractionDigits: 0,
+    }).format(value);
+
+  const tabs = [
+    { id: 'overview', label: 'Visao Geral', icon: <Activity className="h-4 w-4" /> },
+    { id: 'squad', label: 'Elenco', icon: <Users className="h-4 w-4" />, badge: topScorers.length },
+    { id: 'season', label: 'Temporada', icon: <Calendar className="h-4 w-4" /> },
+    { id: 'finance', label: 'Financas', icon: <Wallet className="h-4 w-4" /> },
+    { id: 'news', label: 'Noticias', icon: <Newspaper className="h-4 w-4" />, badge: Math.min(newsFeed.length, 9) },
+  ] as const;
+
+  const summaryCards = (
+    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <StatCard icon={<Trophy className="h-6 w-6" />} tone="emerald" label="Pontos (Liga)" value={leagueStats.points} />
+      <StatCard
+        icon={<DollarSign className="h-6 w-6" />}
+        tone="yellow"
+        label="Financas"
+        value={formatCurrency(userTeam.finances)}
+      />
+      <StatCard icon={<Users className="h-6 w-6" />} tone="blue" label="Forca Titular" value={startersOverall} />
+      <StatCard icon={<Calendar className="h-6 w-6" />} tone="orange" label="Semana" value={currentWeek} />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Visão Geral"
-        subtitle={gameMode === 'player' ? `Bem-vindo de volta, ${userPlayer?.name}.` : 'Bem-vindo de volta, treinador.'}
+        title="Central da Carreira"
+        subtitle={gameMode === 'player' ? `Bem-vindo de volta, ${userPlayer?.name}.` : 'Tudo o que importa da sua carreira em um so lugar.'}
         icon={<Activity className="h-7 w-7" />}
       />
 
-      {gameMode === 'player' && userPlayer && (
-        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard icon={<Activity className="h-6 w-6" />} tone="blue" label="Seu Overall" value={userPlayer.overall} />
-          <StatCard icon={<Trophy className="h-6 w-6" />} tone="emerald" label="Gols" value={userPlayer.goals} />
-          <StatCard icon={<Users className="h-6 w-6" />} tone="yellow" label="Assistências" value={userPlayer.assists} />
-          <StatCard icon={<Calendar className="h-6 w-6" />} tone="purple" label="Partidas" value={userPlayer.matchesPlayed} />
+      <ScreenTabs items={tabs} activeTab={activeTab} onChange={tab => setActiveTab(tab as DashboardTab)} />
+
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {gameMode === 'player' && userPlayer ? (
+            <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+              <StatCard icon={<Activity className="h-6 w-6" />} tone="blue" label="Seu Overall" value={userPlayer.overall} />
+              <StatCard icon={<Trophy className="h-6 w-6" />} tone="emerald" label="Gols" value={userPlayer.goals} />
+              <StatCard icon={<Users className="h-6 w-6" />} tone="yellow" label="Assistencias" value={userPlayer.assists} />
+              <StatCard icon={<Calendar className="h-6 w-6" />} tone="purple" label="Partidas" value={userPlayer.matchesPlayed} />
+            </div>
+          ) : null}
+
+          {summaryCards}
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <SectionCard
+              title="Proximo Jogo"
+              subtitle="Leitura imediata do compromisso mais importante da sua carreira."
+              badge={nextMatch && relevantTeam ? 'Ao vivo na agenda' : undefined}
+            >
+              {nextMatch && relevantTeam ? (
+                <div className="space-y-5">
+                  <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-sky-500/10 p-5">
+                    <div className="flex items-center justify-between gap-4 text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
+                      <span>{isRelevantTeamHome ? 'Casa' : 'Fora'}</span>
+                      <span>Semana {currentWeek}</span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                      <div className="text-right">
+                        <p className="flex items-center justify-end gap-2 text-lg font-black text-emerald-400">
+                          <TeamFlag country={relevantTeam.country} teamName={relevantTeam.name} size="sm" />
+                          <span>{relevantTeam.name}</span>
+                        </p>
+                        <p className="text-sm text-slate-400">Seu lado</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm font-black text-slate-300">
+                        VS
+                      </div>
+                      <div>
+                        <p className="flex items-center gap-2 text-lg font-black text-slate-100">
+                          {nextOpponent ? (
+                            <>
+                              <TeamFlag country={nextOpponent.country} teamName={nextOpponent.name} size="sm" />
+                              <span>{nextOpponent.name}</span>
+                            </>
+                          ) : (
+                            <span>A definir</span>
+                          )}
+                        </p>
+                        <p className="text-sm text-slate-400">Adversario</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">Fim da temporada.</p>
+              )}
+            </SectionCard>
+
+            <SectionCard title="Alertas Urgentes" subtitle="Tudo o que merece sua atencao sem descer a tela demais.">
+              <div className="space-y-3">
+                {urgentItems.length > 0 ? (
+                  urgentItems.map(item => (
+                    <UrgentItem key={item.id} title={item.title} body={item.body} tone={item.tone} />
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400">Nenhum alerta urgente agora. Seu clube esta em ordem.</p>
+                )}
+              </div>
+            </SectionCard>
+          </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={<Trophy className="h-6 w-6" />} tone="emerald" label="Pontos (Liga)" value={leagueStats.points} />
-        <StatCard
-          icon={<DollarSign className="h-6 w-6" />}
-          tone="yellow"
-          label="Finanças"
-          value={new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-            maximumFractionDigits: 0,
-          }).format(userTeam.finances)}
-        />
-        <StatCard icon={<Users className="h-6 w-6" />} tone="blue" label="Força Titular" value={startersOverall} />
-        <StatCard icon={<Calendar className="h-6 w-6" />} tone="orange" label="Semana" value={currentWeek} className="hidden lg:flex" />
-      </div>
-
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-          <div className="flex items-center justify-between border-b border-slate-700 p-6">
-            <h2 className="text-xl font-semibold text-slate-100">Próximo Jogo</h2>
-            {nextMatch && relevantTeam && (
-              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300">
-                {nextMatch.competition === 'LEAGUE'
-                  ? `Nacional Div ${relevantTeam.division}`
-                  : nextMatch.competition === 'REGIONAL'
-                    ? relevantTeam.continent === 'SA'
-                      ? `Estadual (${relevantTeam.state})`
-                      : `Regional (${relevantTeam.country})`
-                    : nextMatch.competition === 'NATIONAL_CUP'
-                      ? relevantTeam.continent === 'SA'
-                        ? 'Copa do Brasil'
-                        : `Copa (${relevantTeam.country})`
-                      : nextMatch.competition === 'CONTINENTAL'
-                        ? relevantTeam.continent === 'SA'
-                          ? 'Libertadores'
-                          : 'Champions'
-                        : nextMatch.competition === 'WORLD_CUP'
-                          ? 'Copa do Mundo'
-                          : nextMatch.competition === 'OLYMPICS'
-                            ? 'Olimpíadas'
-                            : relevantTeam.continent === 'SA'
-                              ? 'Sul-Americana'
-                              : 'Europa League'}
-              </span>
-            )}
-          </div>
-          <div className="p-6">
-            {nextMatch && relevantTeam ? (
-              <div className="flex flex-col items-center justify-center gap-4 py-8">
-                <div className="flex w-full items-center justify-center gap-8">
-                  <div className="flex-1 text-right">
-                    <p className="text-lg font-bold text-emerald-400">{relevantTeam.name}</p>
-                    <p className="text-sm text-slate-400">{isRelevantTeamHome ? 'Seu time • Casa' : 'Seu time • Fora'}</p>
-                  </div>
-                  <div className="rounded-lg bg-slate-900 px-4 py-2 font-mono font-bold text-slate-400">VS</div>
-                  <div className="flex-1 text-left">
-                    <p className="text-lg font-bold text-slate-200">{nextOpponent?.name}</p>
-                    <p className="text-sm text-slate-400">{isRelevantTeamHome ? 'Adversário • Fora' : 'Adversário • Casa'}</p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="py-8 text-center text-slate-400">Fim da temporada.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-          <div className="border-b border-slate-700 p-6">
-            <h2 className="text-xl font-semibold text-slate-100">Artilheiros do Time</h2>
-          </div>
-          <div className="p-0">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-900/50 text-slate-400">
-                <tr>
-                  <th className="px-6 py-3 font-medium">Jogador</th>
-                  <th className="px-6 py-3 font-medium">Pos</th>
-                  <th className="px-6 py-3 text-right font-medium">Gols</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {userTeam.players
-                  .filter(player => player.goals > 0)
-                  .sort((playerA, playerB) => playerB.goals - playerA.goals)
-                  .slice(0, 5)
-                  .map(player => (
-                    <tr key={player.id} className="hover:bg-slate-700/20">
-                      <td className="px-6 py-3 font-medium text-slate-200">{player.name}</td>
-                      <td className="px-6 py-3 text-slate-400">{player.position}</td>
-                      <td className="px-6 py-3 text-right font-bold text-emerald-400">{player.goals}</td>
-                    </tr>
-                  ))}
-                {userTeam.players.filter(player => player.goals > 0).length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="px-6 py-8 text-center text-slate-500">
-                      Nenhum gol marcado ainda.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-          <div className="flex items-center justify-between border-b border-slate-700 p-6">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-100">Resumo da Rodada</h2>
-              <p className="mt-1 text-sm text-slate-400">Leitura rápida do que acabou de acontecer.</p>
-            </div>
-            <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300">
-              Semana {recentRoundSummary?.week ?? currentWeek}
-            </span>
-          </div>
-          <div className="space-y-4 p-6">
-            {recentRoundSummary ? (
-              <>
-                {recentRoundSummary.headlines.map(headline => (
-                  <p key={headline} className="text-sm text-slate-300">
-                    {headline}
-                  </p>
-                ))}
-                <div className="space-y-3">
-                  {recentRoundSummary.userResults.map(result => (
-                    <div key={result.matchId} className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-3">
-                      <p className="text-sm font-semibold text-slate-100">
-                        {result.homeTeamName} {result.homeScore} x {result.awayScore} {result.awayTeamName}
-                      </p>
+      {activeTab === 'squad' && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <SectionCard title="Artilheiros do Time" subtitle="Os nomes mais decisivos do seu elenco.">
+            <div className="space-y-3">
+              {topScorers.length > 0 ? (
+                topScorers.map((player, index) => (
+                  <div key={player.id} className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-3">
+                    <div>
+                      <p className="font-bold text-slate-100">{index + 1}. {player.name}</p>
+                      <p className="text-xs text-slate-400">{player.position} • OVR {player.overall}</p>
                     </div>
-                  ))}
-                  {recentRoundSummary.userResults.length === 0 && (
-                    <p className="text-sm text-slate-400">Seu time não jogou na última semana.</p>
-                  )}
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-slate-400">A rodada ainda não foi concluída.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-          <div className="flex items-center justify-between border-b border-slate-700 p-6">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-100">Notícias do Clube</h2>
-                <p className="mt-1 text-sm text-slate-400">Caixa de mensagens no ritmo do FutBoss.</p>
+                    <span className="text-lg font-black text-emerald-400">{player.goals}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-400">Nenhum gol marcado ainda.</p>
+              )}
             </div>
-            <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300">
-              {injuredPlayers.length} lesionado(s)
-            </span>
-          </div>
-          <div className="space-y-3 p-6">
-            {newsFeed.slice(0, 5).map(item => (
+          </SectionCard>
+
+          <SectionCard title="Situacao do Plantel" subtitle="Visao rapida de titulares, reservas e disponibilidade.">
+            <div className="grid grid-cols-2 gap-4">
+              <MiniMetric label="Titulares definidos" value={`${userTeam.players.filter(player => player.isStarter).length}/11`} />
+              <MiniMetric label="Reservas" value={userTeam.players.filter(player => !player.isStarter).length} />
+              <MiniMetric label="Lesionados" value={injuredPlayers.length} accent="amber" />
+              <MiniMetric label="Forca media" value={startersOverall} accent="emerald" />
+            </div>
+            <div className="mt-4 space-y-3">
+              {injuredPlayers.length > 0 ? (
+                injuredPlayers.slice(0, 5).map(player => (
+                  <div key={player.id} className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+                    <p className="font-semibold text-slate-100">{player.name}</p>
+                    <p className="text-sm text-slate-400">
+                      {player.injury?.type} • {player.injury?.weeksRemaining} semana(s)
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-400">Elenco principal sem lesionados no momento.</p>
+              )}
+            </div>
+          </SectionCard>
+        </div>
+      )}
+
+      {activeTab === 'season' && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <SectionCard title="Resumo da Rodada" subtitle="Leitura rapida do que acabou de acontecer.">
+            <div className="space-y-4">
+              {recentRoundSummary ? (
+                <>
+                  {recentRoundSummary.headlines.map(headline => (
+                    <p key={headline} className="text-sm text-slate-300">{headline}</p>
+                  ))}
+                  <div className="space-y-3">
+                    {recentRoundSummary.userResults.map(result => (
+                      <div key={result.matchId} className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-3">
+                        <p className="font-semibold text-slate-100">
+                          {result.homeTeamName} {result.homeScore} x {result.awayScore} {result.awayTeamName}
+                        </p>
+                      </div>
+                    ))}
+                    {recentRoundSummary.userResults.length === 0 && (
+                      <p className="text-sm text-slate-400">Seu time nao jogou na ultima semana.</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-slate-400">A rodada ainda nao foi concluida.</p>
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Panorama da Temporada" subtitle="Indicadores que situam seu momento no campeonato.">
+            <div className="grid grid-cols-2 gap-4">
+              <MiniMetric label="Pontos" value={leagueStats.points} accent="emerald" />
+              <MiniMetric label="Jogos" value={leagueStats.played} />
+              <MiniMetric label="Vitorias" value={leagueStats.wins} />
+              <MiniMetric label="Saldo" value={leagueStats.goalsFor - leagueStats.goalsAgainst} />
+            </div>
+          </SectionCard>
+        </div>
+      )}
+
+      {activeTab === 'finance' && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <SectionCard title="Resumo Financeiro" subtitle="Leitura limpa do caixa atual sem entrar nas telas longas.">
+            <div className="grid grid-cols-2 gap-4">
+              <MiniMetric label="Saldo" value={formatCurrency(userTeam.finances)} accent="emerald" />
+              <MiniMetric label="Semana atual" value={currentWeek} />
+              <MiniMetric label="Pontos da liga" value={leagueStats.points} />
+              <MiniMetric label="Forca titular" value={startersOverall} />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Sinal Financeiro" subtitle="Use a aba Financas do menu lateral para aprofundar receitas, estadio e mercado.">
+            <p className="text-sm leading-6 text-slate-400">
+              Esta visao foi mantida enxuta para o celular. Os detalhes de patrocinios, receitas comerciais, estadio e custos continuam intactos nas telas proprias do jogo.
+            </p>
+          </SectionCard>
+        </div>
+      )}
+
+      {activeTab === 'news' && (
+        <SectionCard title="Noticias do Clube" subtitle="Caixa de mensagens no ritmo do FutBoss.">
+          <div className="space-y-3">
+            {newsFeed.slice(0, 8).map(item => (
               <div key={item.id} className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-3">
                 <p className="font-semibold text-slate-100">{item.title}</p>
                 <p className="mt-1 text-sm text-slate-400">{item.body}</p>
               </div>
             ))}
-            {newsFeed.length === 0 && <p className="text-sm text-slate-400">Nenhuma notícia publicada ainda.</p>}
+            {newsFeed.length === 0 && <p className="text-sm text-slate-400">Nenhuma noticia publicada ainda.</p>}
           </div>
-        </div>
-      </div>
+        </SectionCard>
+      )}
 
       {gameMode === 'manager' && (
         <div className="rounded-2xl border border-rose-500/20 bg-slate-800 p-6">
@@ -251,7 +344,7 @@ export function Dashboard() {
             <div>
               <h2 className="text-xl font-semibold text-slate-100">Encerrar carreira no clube</h2>
               <p className="mt-1 text-sm text-slate-400">
-                Use esta opção quando quiser se aposentar do comando e voltar ao menu principal.
+                Use esta opcao quando quiser se aposentar do comando e voltar ao menu principal.
               </p>
             </div>
             <button
@@ -268,7 +361,7 @@ export function Dashboard() {
       <ConfirmModal
         open={isRetireModalOpen}
         title="Aposentar do cargo?"
-        description="Você vai encerrar a carreira como técnico e voltar ao menu principal. Use esta opção só quando realmente quiser finalizar esse caminho."
+        description="Voce vai encerrar a carreira como tecnico e voltar ao menu principal. Use esta opcao so quando realmente quiser finalizar esse caminho."
         confirmLabel="Confirmar aposentadoria"
         onCancel={() => setIsRetireModalOpen(false)}
         onConfirm={() => {
@@ -276,6 +369,81 @@ export function Dashboard() {
           resetGame();
         }}
       />
+    </div>
+  );
+}
+
+function SectionCard({
+  title,
+  subtitle,
+  badge,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
+      <div className="flex flex-col gap-3 border-b border-slate-700 bg-slate-900/50 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-black text-slate-100">{title}</h2>
+          {subtitle ? <p className="mt-1 text-sm text-slate-400">{subtitle}</p> : null}
+        </div>
+        {badge ? (
+          <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs font-bold text-slate-300">
+            {badge}
+          </span>
+        ) : null}
+      </div>
+      <div className="p-5">{children}</div>
+    </section>
+  );
+}
+
+function UrgentItem({
+  title,
+  body,
+  tone,
+}: {
+  title: string;
+  body: string;
+  tone: 'amber' | 'emerald' | 'sky';
+}) {
+  const toneClasses = {
+    amber: 'border-amber-500/20 bg-amber-500/5 text-amber-300',
+    emerald: 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300',
+    sky: 'border-sky-500/20 bg-sky-500/5 text-sky-300',
+  };
+
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${toneClasses[tone]}`}>
+      <div className="mb-2 flex items-center gap-2">
+        <Bell className="h-4 w-4" />
+        <p className="font-bold">{title}</p>
+      </div>
+      <p className="text-sm text-slate-300">{body}</p>
+    </div>
+  );
+}
+
+function MiniMetric({
+  label,
+  value,
+  accent = 'slate',
+}: {
+  label: string;
+  value: React.ReactNode;
+  accent?: 'slate' | 'emerald' | 'amber';
+}) {
+  const accentClass =
+    accent === 'emerald' ? 'text-emerald-400' : accent === 'amber' ? 'text-amber-400' : 'text-slate-100';
+
+  return (
+    <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className={`mt-2 text-xl font-black ${accentClass}`}>{value}</p>
     </div>
   );
 }
@@ -302,11 +470,11 @@ function StatCard({
   };
 
   return (
-    <div className={`flex items-center gap-4 rounded-2xl border border-slate-700 bg-slate-800 p-6 ${className}`}>
+    <div className={`flex items-center gap-4 rounded-2xl border border-slate-700 bg-slate-800 p-5 ${className}`}>
       <div className={`rounded-xl p-3 ${toneClasses[tone]}`}>{icon}</div>
-      <div>
+      <div className="min-w-0">
         <p className="text-sm font-medium text-slate-400">{label}</p>
-        <p className="text-2xl font-bold text-slate-100">{value}</p>
+        <p className="truncate text-xl font-black text-slate-100">{value}</p>
       </div>
     </div>
   );

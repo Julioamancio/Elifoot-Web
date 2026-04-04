@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { AuthButton } from './AuthButton';
+import { TeamFlag } from './ui/TeamFlag';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -64,10 +65,16 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
             {gameMode === 'player' && userPlayer ? (
               <>
                 <h2 className="text-lg font-bold text-slate-200">{userPlayer.name}</h2>
-                <p className="text-sm font-medium text-emerald-400">{userTeam.name}</p>
+                <p className="flex items-center gap-2 text-sm font-medium text-emerald-400">
+                  <TeamFlag country={userTeam.country} teamName={userTeam.name} size="xs" />
+                  <span>{userTeam.name}</span>
+                </p>
               </>
             ) : (
-              <h2 className="text-lg font-bold text-slate-200">{userTeam.name}</h2>
+              <h2 className="flex items-center gap-2 text-lg font-bold text-slate-200">
+                <TeamFlag country={userTeam.country} teamName={userTeam.name} size="xs" />
+                <span>{userTeam.name}</span>
+              </h2>
             )}
             <p className="mt-1 text-sm text-slate-400">Semana {currentWeek}</p>
           </div>

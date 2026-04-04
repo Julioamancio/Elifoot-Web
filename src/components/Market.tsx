@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { DollarSign, TrendingUp, UserMinus, UserPlus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { PageHeader } from './ui/PageHeader';
+import { ScreenTabs } from './ui/ScreenTabs';
 
 const getAskingPrice = (
   value: number,
@@ -25,6 +26,7 @@ export function Market() {
   const buyPlayer = useGameStore(state => state.buyPlayer);
   const sellPlayer = useGameStore(state => state.sellPlayer);
   const currentYear = useGameStore(state => state.currentYear ?? 2026);
+  const [activeTab, setActiveTab] = useState<'buy' | 'sell'>('buy');
   const userTeam = teams.find(team => team.id === userTeamId);
 
   if (!userTeam) return null;
@@ -35,8 +37,8 @@ export function Market() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Mercado de Transferências"
-        subtitle="Negocie com mais contexto: valor pedido, contrato e situação do jogador."
+        title="Mercado de Transferencias"
+        subtitle="Compra e venda separadas em sub-abas para facilitar a leitura no celular."
         icon={<TrendingUp className="h-7 w-7" />}
         aside={
           <div className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 px-6 py-3">
@@ -49,14 +51,23 @@ export function Market() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
+      <ScreenTabs
+        items={[
+          { id: 'buy', label: 'Comprar', icon: <UserPlus className="h-4 w-4" />, badge: marketPlayers.length },
+          { id: 'sell', label: 'Vender', icon: <UserMinus className="h-4 w-4" />, badge: userTeam.players.length },
+        ]}
+        activeTab={activeTab}
+        onChange={tab => setActiveTab(tab as 'buy' | 'sell')}
+      />
+
+      {activeTab === 'buy' && (
         <div className="space-y-4">
           <h2 className="flex items-center gap-2 text-xl font-bold text-slate-200">
-            <TrendingUp className="h-5 w-5 text-blue-400" /> Jogadores Disponíveis
+            <TrendingUp className="h-5 w-5 text-blue-400" /> Jogadores Disponiveis
           </h2>
           {marketPlayers.length === 0 ? (
             <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-8 text-center">
-              <p className="text-slate-400">O mercado está fechado no momento. Volte na próxima janela.</p>
+              <p className="text-slate-400">O mercado esta fechado no momento. Volte na proxima janela.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -131,12 +142,14 @@ export function Market() {
             </div>
           )}
         </div>
+      )}
 
+      {activeTab === 'sell' && (
         <div className="space-y-4">
           <h2 className="flex items-center gap-2 text-xl font-bold text-slate-200">
             <DollarSign className="h-5 w-5 text-emerald-400" /> Seu Elenco
           </h2>
-          <div className="custom-scrollbar max-h-[600px] space-y-3 overflow-y-auto pr-2">
+          <div className="space-y-3">
             {userTeam.players.map(player => (
               <div
                 key={player.id}
@@ -198,7 +211,7 @@ export function Market() {
             ))}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

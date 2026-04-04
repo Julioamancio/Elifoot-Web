@@ -3,6 +3,7 @@ import { Medal, Star, Trophy, Users } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { Competition, Player, Position, Team } from '../types/game';
 import { PageHeader } from './ui/PageHeader';
+import { TeamFlag } from './ui/TeamFlag';
 
 const formatOrdinal = (position: number) => `${position}°`;
 
@@ -393,6 +394,7 @@ export function Ranking() {
                     <td className="p-4 text-center">{renderPositionCell(index)}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
+                        <TeamFlag country={team.country} teamName={team.name} size="xs" />
                         <span className={`font-bold ${team.id === userTeamId ? 'text-emerald-400' : 'text-slate-200'}`}>
                           {team.name}
                         </span>
@@ -447,7 +449,12 @@ export function Ranking() {
                         {player.id === userPlayerId && <Star className="h-4 w-4 fill-emerald-400 text-emerald-400" />}
                       </div>
                     </td>
-                    <td className="p-4 text-center text-slate-300">{team.name}</td>
+                    <td className="p-4 text-center text-slate-300">
+                      <span className="inline-flex items-center gap-2">
+                        <TeamFlag country={team.country} teamName={team.name} size="xs" />
+                        <span>{team.name}</span>
+                      </span>
+                    </td>
                     <td className="p-4 text-center">
                       <span className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-slate-300">
                         {team.country}

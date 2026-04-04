@@ -14,6 +14,7 @@ import { useGameStore } from '../store/useGameStore';
 import { getPlayerContractStatus, getPlayerRetirementRisk } from '../game/playerLifecycle';
 import { PageHeader } from './ui/PageHeader';
 import { ConfirmModal } from './ui/ConfirmModal';
+import { TeamFlag } from './ui/TeamFlag';
 
 export function PlayerDashboard() {
   const teams = useGameStore(state => state.teams);
@@ -50,6 +51,23 @@ export function PlayerDashboard() {
         title="Meu Jogador"
         subtitle={`${player.name} • ${userClub.name}${userNationalTeam ? ` • ${userNationalTeam.name}` : ''}`}
         icon={<User className="h-7 w-7" />}
+        aside={
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+            <span className="inline-flex items-center gap-2">
+              <TeamFlag country={userClub.country} teamName={userClub.name} size="xs" />
+              <span>{userClub.name}</span>
+            </span>
+            {userNationalTeam ? (
+              <>
+                <span>•</span>
+                <span className="inline-flex items-center gap-2">
+                  <TeamFlag country={userNationalTeam.country} teamName={userNationalTeam.name} size="xs" />
+                  <span>{userNationalTeam.name}</span>
+                </span>
+              </>
+            ) : null}
+          </div>
+        }
       />
 
       <div className="flex flex-wrap gap-4 text-sm text-slate-500">

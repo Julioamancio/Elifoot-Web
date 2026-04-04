@@ -28,6 +28,7 @@ import {
   type SaveSlotSummary,
 } from '../lib/api';
 import type { GameState } from '../types/game';
+import { TeamFlag } from './ui/TeamFlag';
 
 type FeedbackState = {
   title: string;
@@ -86,6 +87,8 @@ export const AuthButton: React.FC<AuthButtonProps> = ({ onAuthStateChange }) => 
 
   const userTeam = teams.find(team => team.id === userTeamId);
   const userPlayer = userTeam?.players.find(player => player.id === userPlayerId);
+  const getTeamCountryByName = (teamName?: string | null) =>
+    teamName ? teams.find(team => team.name === teamName)?.country ?? null : null;
 
   const derivedSlotName = useMemo(() => {
     if (gameMode === 'player' && userPlayer) {
@@ -575,7 +578,16 @@ export const AuthButton: React.FC<AuthButtonProps> = ({ onAuthStateChange }) => 
                       <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-700 bg-slate-900/40 p-4 md:grid-cols-3">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Time</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-100">{slot.teamName ?? 'Sem time'}</p>
+                          <div className="mt-1 text-sm font-semibold text-slate-100">
+                            {slot.teamName ? (
+                              <span className="inline-flex items-center gap-2">
+                                <TeamFlag country={getTeamCountryByName(slot.teamName)} teamName={slot.teamName} size="xs" />
+                                <span>{slot.teamName}</span>
+                              </span>
+                            ) : (
+                              <span>Sem time</span>
+                            )}
+                          </div>
                         </div>
                         <div>
                           <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Temporada</p>
